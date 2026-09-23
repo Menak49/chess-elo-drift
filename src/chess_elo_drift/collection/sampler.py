@@ -17,6 +17,7 @@ import logging
 import random
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from typing import Iterable
 
 from chess_elo_drift import config
 from chess_elo_drift.chesscom import (
@@ -25,7 +26,7 @@ from chess_elo_drift.chesscom import (
     fetch_monthly_archive,
 )
 from chess_elo_drift.collection.extraction import extract_game
-from chess_elo_drift.collection.store import GameStore
+from chess_elo_drift.collection.store import GameStore, VisitedLog
 from chess_elo_drift.config import Era, YearMonth
 from chess_elo_drift.records import GameRecord
 
@@ -64,6 +65,18 @@ class CoverageTarget:
 
     def credit(self, cell: Cell) -> None:
         self._counts[cell] += 1
+
+    def prime(self, records: Iterable[GameRecord]) -> None:
+        """Count games already collected, so a resumed crawl tops up to the target.
+
+        Without this a second run would read `--per-cell` as "this many more"
+        rather than "this many in total", and quietly double the corpus.
+        """
+        for record in records:
+            for side in record.sides():
+                band = band_floor(side.rating)
+                if band is not None:
+                    self.credit((record.time_class, band))
 
     def wants(self, cell: Cell) -> bool:
         return self.deficit(cell) > 0
@@ -133,6 +146,7 @@ class StratifiedSnowballCrawler:
         rng: random.Random | None = None,
         max_api_requests: int = 4000,
         months_per_player: int = 2,
+        visited: VisitedLog | None = None,
     ) -> None:
         self._client = client
         self._store = store
@@ -144,7 +158,7 @@ class StratifiedSnowballCrawler:
 
         self._frontier: dict[int, deque[str]] = {band: deque() for band in target.bands}
         self._queued: set[str] = set()
-        self._visited: set[str] = set()
+        self._visited: VisitedLog | set[str] = visited if visited is not None else set()
         self._player_cell_counts: dict[tuple[str, str, int], int] = defaultdict(int)
         self.stats = CrawlStats()
 

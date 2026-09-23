@@ -50,3 +50,31 @@ class GameStore:
                     yield GameRecord.from_dict(json.loads(line))
                 except (json.JSONDecodeError, KeyError, TypeError):
                     continue
+
+
+class VisitedLog:
+    """Accounts whose archives have already been read, persisted across runs.
+
+    Keeping this out of the game store matters: most visited accounts yield
+    nothing usable, and without a record of them a resumed crawl would spend its
+    whole budget walking the same barren ground again.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._names: set[str] = set()
+        if self.path.exists():
+            self._names = set(json.loads(self.path.read_text(encoding="utf-8")))
+
+    def __contains__(self, username: str) -> bool:
+        return username in self._names
+
+    def __len__(self) -> int:
+        return len(self._names)
+
+    def add(self, username: str) -> None:
+        self._names.add(username)
+
+    def save(self) -> None:
+        self.path.write_text(json.dumps(sorted(self._names)), encoding="utf-8")

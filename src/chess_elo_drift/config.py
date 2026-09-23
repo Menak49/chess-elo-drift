@@ -97,9 +97,17 @@ ENGINE_DEPTH = 12
 #: opening preparation rather than playing strength.
 OPENING_PLIES_SKIPPED = 8
 
-#: Plies scored per game, sampled at random after the opening. Capping keeps the
-#: per-game cost bounded and stops long games from crowding out short ones.
-MAX_PLIES_SCORED_PER_GAME = 24
+#: Safety cap on how many plies of a single game are scored, counted from the
+#: end of the opening. Set high enough that ordinary games are scored in full;
+#: it exists so that a pathological 300-move game cannot monopolise a worker.
+MAX_PLIES_SCORED_PER_GAME = 200
+
+#: A side scored on fewer moves than this says too little to enter the analysis.
+MIN_MOVES_SCORED_PER_SIDE = 8
+
+#: Where the UCI engine binary lives, and how many are run at once.
+ENGINE_PATH = PROJECT_ROOT / "tools" / "stockfish" / "stockfish.exe"
+DEFAULT_ENGINE_WORKERS = 14
 
 
 # --- HTTP -------------------------------------------------------------------

@@ -15,12 +15,16 @@ import json
 import logging
 import random
 import sys
+from pathlib import Path
 
 from chess_elo_drift import config
 from chess_elo_drift.chesscom import ChessComClient
 from chess_elo_drift.collection.sampler import CoverageTarget, StratifiedSnowballCrawler
 from chess_elo_drift.collection.seeds import load_seeds_for_era
-from chess_elo_drift.collection.store import GameStore
+from chess_elo_drift.collection.store import GameStore, VisitedLog
+from chess_elo_drift.engine.results import EvaluationWriter
+from chess_elo_drift.engine.runner import evaluate_corpus
+from chess_elo_drift.selection import balanced_subsample, summarise_cells
 
 
 def configure_logging(verbose: bool = False) -> None:
@@ -45,7 +49,10 @@ def run_collect(args: argparse.Namespace) -> int:
         for era in config.ERAS:
             seeds = load_seeds_for_era(client, era, config.DATA_RAW)
             store = GameStore(games_path(era.name))
+            visited = VisitedLog(config.DATA_RAW / f"visited_{era.name}.json")
             target = CoverageTarget(args.per_cell)
+            target.prime(store.read_all())
+
             crawler = StratifiedSnowballCrawler(
                 client,
                 store,
@@ -53,17 +60,49 @@ def run_collect(args: argparse.Namespace) -> int:
                 target,
                 rng=random.Random(args.seed),
                 max_api_requests=args.max_requests,
+                visited=visited,
             )
             logger.info(
-                "crawling era %s (%d months, target %d games per cell, store holds %d)",
-                era.name, len(era.months), args.per_cell, len(store),
+                "crawling %s: %d months, target %d per cell, resuming from %d games "
+                "and %d visited accounts (coverage %s)",
+                era.name, len(era.months), args.per_cell, len(store), len(visited), target.progress,
             )
-            stats = crawler.crawl(seeds)
+            try:
+                stats = crawler.crawl(seeds)
+            finally:
+                visited.save()
             logger.info("era %s done: %s", era.name, stats.as_dict())
 
             stats_path = config.DATA_RAW / f"crawl_stats_{era.name}.json"
             stats_path.write_text(json.dumps(stats.as_dict(), indent=2), encoding="utf-8")
 
+    return 0
+
+
+def run_evaluate(args: argparse.Namespace) -> int:
+    """Re-analyse every collected game with the engine and store move quality."""
+    logger = logging.getLogger("evaluate")
+
+    records = [
+        record
+        for era in config.ERAS
+        for record in GameStore(games_path(era.name)).read_all()
+    ]
+    logger.info("corpus holds %d games", len(records))
+
+    selected = balanced_subsample(records, args.limit)
+    if len(selected) < len(records):
+        logger.info("selected %d games, balanced across the design", len(selected))
+    logger.debug("cell sizes: %s", summarise_cells(selected))
+
+    writer = EvaluationWriter(config.DATA_PROCESSED / "evaluations.csv")
+    evaluate_corpus(
+        selected,
+        writer,
+        engine_path=args.engine,
+        depth=args.depth,
+        workers=args.workers,
+    )
     return 0
 
 
@@ -87,6 +126,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     collect.add_argument("--seed", type=int, default=20182025, help="RNG seed")
     collect.set_defaults(handler=run_collect)
+
+    evaluate = subcommands.add_parser("evaluate", help="score collected games with the engine")
+    evaluate.add_argument("--depth", type=int, default=config.ENGINE_DEPTH, help="fixed search depth")
+    evaluate.add_argument(
+        "--workers", type=int, default=config.DEFAULT_ENGINE_WORKERS,
+        help="engine processes to run in parallel",
+    )
+    evaluate.add_argument(
+        "--limit", type=int, default=0,
+        help="cap on games to score, spread evenly across the design (0 = all)",
+    )
+    evaluate.add_argument("--engine", type=Path, default=config.ENGINE_PATH, help="UCI engine binary")
+    evaluate.set_defaults(handler=run_evaluate)
 
     return parser
 
