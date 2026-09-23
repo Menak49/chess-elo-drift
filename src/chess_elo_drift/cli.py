@@ -22,6 +22,8 @@ from chess_elo_drift.chesscom import ChessComClient
 from chess_elo_drift.collection.sampler import CoverageTarget, StratifiedSnowballCrawler
 from chess_elo_drift.collection.seeds import load_seeds_for_era
 from chess_elo_drift.collection.store import GameStore, VisitedLog
+from chess_elo_drift.analysis.dataset import build_estimation_sample, load_evaluations
+from chess_elo_drift.analysis.report import generate_report
 from chess_elo_drift.engine.results import EvaluationWriter
 from chess_elo_drift.engine.runner import evaluate_corpus
 from chess_elo_drift.selection import balanced_subsample, summarise_cells
@@ -106,6 +108,18 @@ def run_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_report(args: argparse.Namespace) -> int:
+    """Build the estimation sample, run the comparisons and write the report."""
+    logger = logging.getLogger("report")
+
+    evaluations = load_evaluations(args.evaluations)
+    sample = build_estimation_sample(evaluations, max_per_player=args.max_per_player)
+    artifacts = generate_report(sample, evaluations)
+
+    logger.info("findings: %s", artifacts.findings)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="chess-elo-drift", description=__doc__)
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -139,6 +153,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evaluate.add_argument("--engine", type=Path, default=config.ENGINE_PATH, help="UCI engine binary")
     evaluate.set_defaults(handler=run_evaluate)
+
+    report = subcommands.add_parser("report", help="compare the eras and write the findings")
+    report.add_argument(
+        "--evaluations", type=Path, default=None, help="engine output CSV to analyse"
+    )
+    report.add_argument(
+        "--max-per-player", type=int, default=3,
+        help="cap on rows one player contributes per era and cadence",
+    )
+    report.set_defaults(handler=run_report)
 
     return parser
 
