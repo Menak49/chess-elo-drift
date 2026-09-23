@@ -8,6 +8,13 @@ version = "1.0.0"
 description = "Did a given chess.com rating mean the same playing strength in 2018-2019 as it does in 2024-2025?"
 requires-python = ">=3.10"
 
+# Dependencies and their versions live in requirements.txt, which carries the
+# reason for each one. They are deliberately not repeated here: two lists of the
+# same pins drift apart.
+
+[project.scripts]
+chess-elo-drift = "chess_elo_drift.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
