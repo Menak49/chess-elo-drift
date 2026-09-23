@@ -1,0 +1,14 @@
+# HTTP access to the chess.com public API
+requests>=2.31
+
+# PGN parsing and UCI engine driving
+chess>=1.10
+
+# Analysis
+pandas>=2.0
+numpy>=1.24
+scipy>=1.11
+matplotlib>=3.7
+
+# Tests
+pytest>=7.4
