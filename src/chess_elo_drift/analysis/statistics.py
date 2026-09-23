@@ -23,6 +23,25 @@ from scipy import stats
 from chess_elo_drift import config
 
 
+#: The columns each table carries. Naming them means a comparison that selects
+#: nothing still returns an empty table of the right shape, rather than a
+#: column-less frame that blows up on the next `sort_values`. A thin sample is
+#: a normal early state of this study, not an error.
+_BAND_SUMMARY_COLUMNS = (
+    "time_class", "band", "band_label", "era", "observations", "players", "mean", "std", "sem",
+)
+_BAND_COMPARISON_COLUMNS = (
+    "time_class", "band", "band_label", "n_legacy", "n_modern",
+    "mean_legacy", "mean_modern", "difference", "p_value",
+)
+#: The keys `GapEstimate.as_row` emits, which are report labels rather than the
+#: dataclass field names.
+_GAP_COLUMNS = (
+    "time_class", "metric", "modern_minus_legacy", "std_error", "t", "p_value",
+    "ci_95_low", "ci_95_high", "observations", "players",
+)
+
+
 @dataclass(frozen=True)
 class GapEstimate:
     """The modern-minus-legacy difference in one metric, with its uncertainty."""
@@ -74,7 +93,11 @@ def describe_by_band(sample: pd.DataFrame, metric: str = "accuracy") -> pd.DataF
                 "sem": _clustered_sem(cell, metric),
             }
         )
-    return pd.DataFrame(rows).sort_values(["time_class", "band", "era"]).reset_index(drop=True)
+    return (
+        pd.DataFrame(rows, columns=list(_BAND_SUMMARY_COLUMNS))
+        .sort_values(["time_class", "band", "era"])
+        .reset_index(drop=True)
+    )
 
 
 def compare_bands(sample: pd.DataFrame, metric: str = "accuracy") -> pd.DataFrame:
@@ -105,7 +128,11 @@ def compare_bands(sample: pd.DataFrame, metric: str = "accuracy") -> pd.DataFram
                 "p_value": float(f"{test.pvalue:.2}"),
             }
         )
-    return pd.DataFrame(rows).sort_values(["time_class", "band"]).reset_index(drop=True)
+    return (
+        pd.DataFrame(rows, columns=list(_BAND_COMPARISON_COLUMNS))
+        .sort_values(["time_class", "band"])
+        .reset_index(drop=True)
+    )
 
 
 def estimate_gap(
@@ -159,7 +186,27 @@ def estimate_all_gaps(sample: pd.DataFrame, metrics: tuple[str, ...] = ("accurac
         for time_class in config.TIME_CLASSES
         for metric in metrics
     ]
-    return pd.DataFrame([e.as_row() for e in estimates if e is not None])
+    rows = [e.as_row() for e in estimates if e is not None]
+    return pd.DataFrame(rows, columns=list(_GAP_COLUMNS))
+
+
+def accuracy_slope_per_100(sample: pd.DataFrame, time_class: str) -> tuple[float, float] | None:
+    """How much accuracy rises per 100 rating points, and that slope's error.
+
+    Returned alongside any conversion into rating points, because it is the
+    denominator of that conversion and the reader cannot judge the result
+    without it.
+    """
+    cell = sample[sample["time_class"] == time_class]
+    if len(cell) < 20 or cell["era"].nunique() < 2:
+        return None
+
+    rating = cell["rating_centred"].to_numpy(dtype=float) / 100.0
+    design = np.column_stack([np.ones(len(cell)), cell["is_modern"].to_numpy(dtype=float), rating])
+    fit = _ols_with_clustered_errors(
+        design, cell["accuracy"].to_numpy(dtype=float), cell["username"].to_numpy()
+    )
+    return float(fit.coefficients[2]), float(fit.standard_errors[2])
 
 
 def rating_equivalent_of_gap(sample: pd.DataFrame, time_class: str) -> float | None:
@@ -168,17 +215,20 @@ def rating_equivalent_of_gap(sample: pd.DataFrame, time_class: str) -> float | N
     Accuracy rises with rating at some slope; dividing the era gap by that slope
     says how many rating points the difference is worth, which is the form the
     original question was asked in.
+
+    Read it as an order of magnitude, never as a figure. The slope is shallow --
+    a few tenths of an accuracy point per 100 rating -- so it sits in the
+    denominator of a ratio whose own uncertainty is large, and two cadences with
+    near-identical accuracy gaps can convert to rating gaps that differ by a
+    factor of two. `accuracy_slope_per_100` returns the denominator so the
+    conversion can be reported with the slope that produced it.
     """
     gap = estimate_gap(sample, time_class, "accuracy")
-    if gap is None:
+    slope = accuracy_slope_per_100(sample, time_class)
+    if gap is None or slope is None:
         return None
 
-    cell = sample[sample["time_class"] == time_class]
-    rating = cell["rating_centred"].to_numpy(dtype=float) / 100.0
-    design = np.column_stack([np.ones(len(cell)), cell["is_modern"].to_numpy(dtype=float), rating])
-    fit = _ols_with_clustered_errors(design, cell["accuracy"].to_numpy(dtype=float), cell["username"].to_numpy())
-
-    slope_per_100 = float(fit.coefficients[2])
+    slope_per_100, _ = slope
     if abs(slope_per_100) < 1e-9:
         return None
     return gap.estimate / slope_per_100 * 100.0

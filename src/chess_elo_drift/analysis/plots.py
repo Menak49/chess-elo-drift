@@ -49,6 +49,11 @@ def plot_metric_by_band(
     interval it sits in.
     """
     cadences = [tc for tc in config.TIME_CLASSES if tc in set(summary["time_class"])]
+    if not cadences:
+        return _placeholder(
+            output_path, title, "No observations survived the inclusion rules yet."
+        )
+
     figure, axes = plt.subplots(
         1, len(cadences), figsize=(5.6 * len(cadences), 5.0), sharey=True, facecolor=SURFACE
     )
@@ -77,9 +82,11 @@ def plot_metric_by_band(
     axes[0].set_ylabel(metric_label, color=INK_MUTED, fontsize=11)
     axes[0].legend(frameon=False, loc="best", fontsize=10, labelcolor=INK)
 
-    figure.suptitle(title, fontsize=15, color=INK, x=0.02, ha="left", weight="medium")
-    figure.text(0.02, 0.925, subtitle, fontsize=10.5, color=INK_MUTED, ha="left")
-    figure.tight_layout(rect=(0, 0, 1, 0.90))
+    # Explicit y for both: the default suptitle position sits close enough to the
+    # subtitle that the two descenders touch at this figure height.
+    figure.suptitle(title, fontsize=15, color=INK, x=0.02, y=0.975, ha="left", weight="medium")
+    figure.text(0.02, 0.9, subtitle, fontsize=10.5, color=INK_MUTED, ha="left", va="top")
+    figure.tight_layout(rect=(0, 0, 1, 0.87))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=160, facecolor=SURFACE)
@@ -89,6 +96,13 @@ def plot_metric_by_band(
 
 def plot_reported_accuracy_coverage(coverage: pd.DataFrame, output_path: Path) -> Path:
     """Show how unusable the API's own accuracy field is for a time comparison."""
+    if coverage.empty:
+        return _placeholder(
+            output_path,
+            "chess.com accuracy coverage",
+            "No evaluated games yet.",
+        )
+
     figure, axis = plt.subplots(figsize=(7.4, 4.4), facecolor=SURFACE)
 
     labels = [f"{row.time_class}\n{row.era}" for row in coverage.itertuples()]
@@ -119,14 +133,33 @@ def plot_reported_accuracy_coverage(coverage: pd.DataFrame, output_path: Path) -
 
     figure.suptitle(
         "chess.com only publishes an accuracy score for games somebody reviewed",
-        fontsize=13.5, color=INK, x=0.02, ha="left", weight="medium",
+        fontsize=13.5, color=INK, x=0.02, y=0.975, ha="left", weight="medium",
     )
     figure.text(
-        0.02, 0.905,
+        0.02, 0.885,
         "Why the study recomputes accuracy instead of reading it from the API",
-        fontsize=10.5, color=INK_MUTED, ha="left",
+        fontsize=10.5, color=INK_MUTED, ha="left", va="top",
     )
-    figure.tight_layout(rect=(0, 0, 1, 0.88))
+    figure.tight_layout(rect=(0, 0, 1, 0.85))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=160, facecolor=SURFACE)
+    plt.close(figure)
+    return output_path
+
+
+def _placeholder(output_path: Path, title: str, message: str) -> Path:
+    """A figure that says there is nothing to draw.
+
+    A run on a sample too thin to plot is a normal early state of the study, and
+    the report should say so on the page rather than fail on the way to writing
+    it.
+    """
+    figure, axis = plt.subplots(figsize=(7.4, 4.0), facecolor=SURFACE)
+    axis.axis("off")
+    axis.text(0.5, 0.55, message, ha="center", va="center", fontsize=12, color=INK_MUTED)
+    figure.suptitle(title, fontsize=13.5, color=INK, x=0.02, ha="left", weight="medium")
+    figure.tight_layout(rect=(0, 0, 1, 0.9))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=160, facecolor=SURFACE)

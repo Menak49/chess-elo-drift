@@ -136,7 +136,7 @@ def _render_findings(
 
     lines.append("\n## Files\n")
     for name, path in {**tables, **figures}.items():
-        lines.append(f"- `{name}`: `{path.relative_to(config.PROJECT_ROOT).as_posix()}`")
+        lines.append(f"- `{name}`: `{_display_path(path)}`")
 
     return "\n".join(lines) + "\n"
 
@@ -199,10 +199,15 @@ def _interpret_cadence(sample: pd.DataFrame, gaps: pd.DataFrame, time_class: str
         f"(95% CI {record['ci_95_low']:+.2f} to {record['ci_95_high']:+.2f}, "
         f"{record['players']} players)."
     )
-    if equivalent is not None and record["p_value"] < 0.05:
+    slope = stats.accuracy_slope_per_100(sample, time_class)
+    if equivalent is not None and slope is not None and record["p_value"] < 0.05:
+        slope_per_100, slope_error = slope
         text += (
-            f" On the same sample, accuracy rises with rating, so the gap is worth "
-            f"roughly **{equivalent:+.0f} rating points**."
+            f" Accuracy rises by only {slope_per_100:.2f} points per 100 rating here "
+            f"(SE {slope_error:.2f}), and dividing the gap by that slope puts it at "
+            f"very roughly **{equivalent:+.0f} rating points** -- an order of "
+            f"magnitude, not a figure: the divisor is small, so the ratio is far less "
+            f"certain than the accuracy gap above it."
         )
     return text
 
@@ -255,6 +260,18 @@ def _caveat_lines() -> list[str]:
 
 
 # -- formatting --------------------------------------------------------------
+
+
+def _display_path(path: Path) -> str:
+    """Name an artefact relative to the repository, or absolutely if it is outside it.
+
+    `generate_report` takes an arbitrary `output_root`, so the artefacts are not
+    always under the project: a caller may be writing to a scratch directory.
+    """
+    try:
+        return path.relative_to(config.PROJECT_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def _write_table(frame: pd.DataFrame, path: Path) -> Path:

@@ -4,6 +4,9 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 reports/figures/*.png
+reports/tables/*.csv
+# reports/findings.md is tracked on purpose: the tables and figures are derived
+# data, but the written conclusion is the deliverable.
 tools/stockfish/
 
 # Python
