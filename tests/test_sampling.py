@@ -1,6 +1,7 @@
 import pytest
 
 from chess_elo_drift import config
+from chess_elo_drift.chesscom.client import ChessComError
 from chess_elo_drift.collection.extraction import extract_game
 from chess_elo_drift.collection.sampler import CoverageTarget, band_floor, study_bands
 from chess_elo_drift.config import YearMonth
@@ -157,3 +158,61 @@ def test_subsampling_spreads_the_budget_across_cells():
 def test_subsampling_is_deterministic():
     records = [_record(i, "2024-2025", "rapid", 1400) for i in range(100)]
     assert balanced_subsample(records, 10) == balanced_subsample(records, 10)
+
+
+# -- surviving a flaky API ---------------------------------------------------
+
+
+class FlakyClient:
+    """A stand-in for the API that fails on the accounts it is told to fail on."""
+
+    def __init__(self, *, failing: frozenset[str] = frozenset(), fail_everything: bool = False):
+        self._failing = failing
+        self._fail_everything = fail_everything
+        self.calls: list[str] = []
+
+    def get(self, path: str) -> dict:
+        self.calls.append(path)
+        username = path.split("/")[1]
+        if self._fail_everything or username in self._failing:
+            raise ChessComError(f"HTTP 502 for {path}")
+        if path.endswith("/archives"):
+            return {"archives": [f"https://api.chess.com/pub/player/{username}/games/2018/03"]}
+        return {"games": [raw_game(uuid=f"{username}-game")]}
+
+
+def crawler_over(client, tmp_path, seeds, **kwargs):
+    from chess_elo_drift.collection.sampler import StratifiedSnowballCrawler
+    from chess_elo_drift.collection.store import GameStore
+
+    return StratifiedSnowballCrawler(
+        client,
+        GameStore(tmp_path / "games.jsonl"),
+        config.LEGACY_ERA,
+        CoverageTarget(observations_per_cell=1),
+        max_api_requests=200,
+        **kwargs,
+    )
+
+
+def test_one_failing_account_does_not_end_the_crawl(tmp_path):
+    """A 502 the client already retried is one bad account, not a dead API."""
+    client = FlakyClient(failing=frozenset({"broken"}))
+    crawler = crawler_over(client, tmp_path, ["broken", "alice"])
+
+    stats = crawler.crawl(["broken", "alice"])
+
+    assert stats.players_failed == 1
+    assert stats.games_stored > 0  # the crawl carried on and collected
+
+
+def test_a_run_of_failures_stops_the_crawl_rather_than_burning_the_frontier(tmp_path):
+    """When every call fails the API is down, and walking on only marks good
+    accounts as visited so a later resumed run would skip them."""
+    client = FlakyClient(fail_everything=True)
+    crawler = crawler_over(client, tmp_path, [], max_consecutive_failures=3)
+
+    stats = crawler.crawl([f"player{i}" for i in range(50)])
+
+    assert stats.players_failed == 3
+    assert stats.games_stored == 0

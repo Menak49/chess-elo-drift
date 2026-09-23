@@ -25,6 +25,7 @@ from chess_elo_drift.chesscom import (
     fetch_available_months,
     fetch_monthly_archive,
 )
+from chess_elo_drift.chesscom.client import ChessComError
 from chess_elo_drift.collection.extraction import extract_game
 from chess_elo_drift.collection.store import GameStore, VisitedLog
 from chess_elo_drift.config import Era, YearMonth
@@ -113,6 +114,7 @@ class CrawlStats:
     players_visited: int = 0
     players_active_in_era: int = 0
     accuracy_field_present: int = 0
+    players_failed: int = 0
     per_band_counts: dict[int, dict[str, int]] = field(default_factory=dict)
 
     @property
@@ -129,6 +131,7 @@ class CrawlStats:
             "players_visited": self.players_visited,
             "players_active_in_era": self.players_active_in_era,
             "accuracy_field_present": self.accuracy_field_present,
+            "players_failed": self.players_failed,
             "per_band_counts": self.per_band_counts,
         }
 
@@ -147,6 +150,7 @@ class StratifiedSnowballCrawler:
         max_api_requests: int = 4000,
         months_per_player: int = 2,
         visited: VisitedLog | None = None,
+        max_consecutive_failures: int = 10,
     ) -> None:
         self._client = client
         self._store = store
@@ -155,6 +159,7 @@ class StratifiedSnowballCrawler:
         self._rng = rng or random.Random(20182025)
         self._max_requests = max_api_requests
         self._months_per_player = months_per_player
+        self._max_consecutive_failures = max_consecutive_failures
 
         self._frontier: dict[int, deque[str]] = {band: deque() for band in target.bands}
         self._queued: set[str] = set()
@@ -169,15 +174,39 @@ class StratifiedSnowballCrawler:
 
         The seed order is taken as given: the provider ranks the accounts most
         likely to have been active in this era first.
+
+        One account failing is not the crawl failing. The public API returns the
+        occasional 502 on an account the client has already retried, and there
+        are always more accounts in the frontier, so a failure is logged and the
+        walk moves on. A run of `max_consecutive_failures` failures is different:
+        that is the API being down rather than one bad account, and continuing
+        would only burn through the frontier marking good accounts as visited.
         """
         seed_queue = deque(seeds)
+        consecutive_failures = 0
 
         while not self._target.is_complete and self.stats.api_requests < self._max_requests:
             username = self._next_player(seed_queue)
             if username is None:
                 logger.warning("[%s] frontier exhausted, stopping early", self._era.name)
                 break
-            self._visit(username)
+            try:
+                self._visit(username)
+            except ChessComError as exc:
+                self.stats.players_failed += 1
+                consecutive_failures += 1
+                logger.warning(
+                    "[%s] skipping %s: %s (%d in a row)",
+                    self._era.name, username, exc, consecutive_failures,
+                )
+                if consecutive_failures >= self._max_consecutive_failures:
+                    logger.error(
+                        "[%s] %d consecutive API failures, stopping: the API looks unavailable",
+                        self._era.name, consecutive_failures,
+                    )
+                    break
+            else:
+                consecutive_failures = 0
             if self.stats.players_visited % 50 == 0:
                 logger.info(
                     "[%s] %d visited (%d active), %d requests, %d games, coverage %s",

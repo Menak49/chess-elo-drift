@@ -10,7 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -79,13 +79,21 @@ def evaluate_corpus(
         initializer=_init_worker,
         initargs=(str(engine_path), depth, opening_plies, max_plies),
     ) as pool:
-        for evaluation in pool.map(_analyse_task, tasks, chunksize=1):
-            if evaluation is None:
-                continue
-            writer.append(to_rows(by_id[evaluation.game_id], evaluation))
-            scored += 1
-            if scored % report_every == 0:
-                _log_progress(scored, len(tasks), started)
+        # Completion order, not submission order. Games differ wildly in cost --
+        # a 200-ply middlegame can take a hundred times as long as a short one --
+        # and an ordered map would hold every finished result in memory behind
+        # the slowest one, so an interrupted run would lose work it had done.
+        pending_futures = {pool.submit(_analyse_task, task) for task in tasks}
+        while pending_futures:
+            done, pending_futures = wait(pending_futures, return_when=FIRST_COMPLETED)
+            for future in done:
+                evaluation = future.result()
+                if evaluation is None:
+                    continue
+                writer.append(to_rows(by_id[evaluation.game_id], evaluation))
+                scored += 1
+                if scored % report_every == 0:
+                    _log_progress(scored, len(tasks), started)
 
     logger.info("scored %d/%d games in %.1fs", scored, len(tasks), time.monotonic() - started)
     return scored
