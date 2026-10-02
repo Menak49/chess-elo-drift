@@ -1,4 +1,4 @@
-# HTTP access to the chess.com public API
+# HTTP access to the chess.com and Lichess public APIs
 requests>=2.31
 
 # PGN parsing and UCI engine driving

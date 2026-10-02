@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chess-elo-drift"
-version = "1.0.0"
-description = "Did a given chess.com rating mean the same playing strength in 2018-2019 as it does in 2024-2025?"
+version = "2.0.0"
+description = "What playing strength does a chess rating buy on chess.com and Lichess, 2014-2026, and how do the 2026 pools convert?"
 requires-python = ">=3.10"
 
 # Dependencies and their versions live in requirements.txt, which carries the

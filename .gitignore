@@ -3,10 +3,8 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
-reports/figures/*.png
-reports/tables/*.csv
-# reports/findings.md is tracked on purpose: the tables and figures are derived
-# data, but the written conclusion is the deliverable.
+# reports/ is tracked on purpose: it is the study's deliverable, and
+# findings.md links to the tables and figures next to it.
 tools/stockfish/
 
 # Python
@@ -23,3 +21,5 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+logs/
