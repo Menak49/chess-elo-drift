@@ -14,6 +14,8 @@ from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 from typing import Iterable, Sequence
 
+import chess.engine
+
 from chess_elo_drift import config
 from chess_elo_drift.engine.evaluator import GameAnalyzer, GameEvaluation
 from chess_elo_drift.engine.results import EvaluationWriter, to_rows
@@ -43,6 +45,14 @@ def _analyse_task(task: tuple[str, str]) -> GameEvaluation | None:
         return None
     try:
         return _ANALYZER.analyse(game_id, pgn)
+    except chess.engine.EngineTerminatedError:
+        # A dead engine would otherwise fail every game this worker is handed
+        # for the rest of the run. Start a fresh one; the game is retried by the
+        # next run, since nothing was written for it.
+        logger.exception("engine died on game %s; restarting it", game_id)
+        _ANALYZER.close()
+        _ANALYZER.open()
+        return None
     except Exception:  # noqa: BLE001 - an unreadable game must not kill the run
         logger.exception("failed to analyse game %s", game_id)
         return None
@@ -58,6 +68,7 @@ def evaluate_corpus(
     opening_plies: int = config.OPENING_PLIES_SKIPPED,
     max_plies: int = config.MAX_PLIES_SCORED_PER_GAME,
     report_every: int = 100,
+    stall_seconds: float = 600.0,
 ) -> int:
     """Evaluate every record not already present in the writer's output.
 
@@ -85,7 +96,19 @@ def evaluate_corpus(
         # the slowest one, so an interrupted run would lose work it had done.
         pending_futures = {pool.submit(_analyse_task, task) for task in tasks}
         while pending_futures:
-            done, pending_futures = wait(pending_futures, return_when=FIRST_COMPLETED)
+            done, pending_futures = wait(
+                pending_futures, timeout=stall_seconds, return_when=FIRST_COMPLETED
+            )
+            if not done:
+                # No game in `stall_seconds` means a wedged worker, not a slow
+                # game (the longest take seconds). Stop rather than hang: what
+                # is left stays unscored and the next run picks it up.
+                logger.error(
+                    "no game finished in %.0fs; stopping with %d games unscored",
+                    stall_seconds, len(pending_futures),
+                )
+                _abandon(pool)
+                break
             for future in done:
                 evaluation = future.result()
                 if evaluation is None:
@@ -97,6 +120,14 @@ def evaluate_corpus(
 
     logger.info("scored %d/%d games in %.1fs", scored, len(tasks), time.monotonic() - started)
     return scored
+
+
+def _abandon(pool: ProcessPoolExecutor) -> None:
+    """Stop a pool whose workers may never return, without waiting on them."""
+    pool.shutdown(wait=False, cancel_futures=True)
+    # The executor offers no public way to stop a worker mid-task.
+    for process in list(getattr(pool, "_processes", {}).values()):
+        process.terminate()
 
 
 def _pending(records: Iterable[GameRecord], done: set[str]) -> list[GameRecord]:

@@ -1,18 +1,19 @@
 """Turning engine evaluations into a per-move quality score.
 
-chess.com's own accuracy number cannot be used for this study: it is absent from
-essentially every 2018-2019 game of an ordinary player, present on only a small,
-self-selected slice of recent ones, and its formula changed in between. Whatever
-that number would show, it would be a fact about chess.com's analysis coverage
-rather than about how people play.
+Neither site's own accuracy number can be used for this study. chess.com's is
+absent from essentially every older game of an ordinary player, present on only
+a small, self-selected slice of recent ones, and its formula changed in between;
+Lichess computes its own on a different formula, and only for games somebody
+asked to analyse. Whatever those numbers would show, they would be facts about
+each site's analysis coverage rather than about how people play.
 
 So accuracy is recomputed here, from the moves, with one fixed engine at one
-fixed depth for every game of both eras. The scale is the one popularised by
+fixed depth for every game of every year on both sites. The scale is the one popularised by
 Lichess -- itself a published reconstruction of the same idea as chess.com's
 CAPS -- which maps an evaluation to an expected score and then a loss of
 expected score to a 0-100 accuracy. The absolute numbers are therefore not
-directly comparable to a chess.com accuracy; the *difference between the two
-eras* is what the study measures, and it is measured with a single instrument.
+directly comparable to either site's accuracy; the *differences between years
+and sites* are what the study measures, and it is measured with a single instrument.
 """
 
 from __future__ import annotations

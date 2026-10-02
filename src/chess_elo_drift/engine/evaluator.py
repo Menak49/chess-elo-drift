@@ -137,7 +137,7 @@ class GameAnalyzer:
 
         Terminal positions are left out: an engine has nothing to say about a
         finished game, so the mating move itself goes unscored. The same rule
-        applies to every game in both eras, so the comparison is unaffected.
+        applies to every game of every year and site, so comparisons are unaffected.
         """
         board = chess.Board()
         evaluations: dict[int, float] = {}
@@ -211,12 +211,17 @@ def _summarise(
 
 
 def _read_mainline(pgn: str) -> list[chess.Move] | None:
-    """Parse a PGN into its mainline moves, or None if it is unreadable."""
+    """Parse a PGN into its mainline moves, or None if it is unreadable.
+
+    A game that starts from a set-up position is refused too: its moves are only
+    legal from that position, and replaying them from the normal start sends the
+    engine an illegal move sequence, which kills the engine process.
+    """
     try:
         game = chess.pgn.read_game(io.StringIO(pgn))
     except (ValueError, RuntimeError):
         return None
-    if game is None:
+    if game is None or game.board() != chess.Board():
         return None
     moves = list(game.mainline_moves())
     return moves or None

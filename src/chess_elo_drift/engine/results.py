@@ -12,17 +12,20 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from chess_elo_drift.engine.evaluator import GameEvaluation
-from chess_elo_drift.records import GameRecord
+from chess_elo_drift.records import GameRecord, estimated_duration_seconds
 
 COLUMNS: Sequence[str] = (
     "game_id",
-    "era",
+    "platform",
+    "year",
     "month",
     "time_class",
     "time_control",
+    "estimated_seconds",
     "colour",
     "username",
     "rating",
+    "provisional",
     "opponent_rating",
     "result",
     "ply_count",
@@ -45,13 +48,16 @@ def to_rows(record: GameRecord, evaluation: GameEvaluation) -> list[dict[str, ob
         rows.append(
             {
                 "game_id": record.game_id,
-                "era": record.era,
+                "platform": record.platform,
+                "year": record.year,
                 "month": record.month,
                 "time_class": record.time_class,
                 "time_control": record.time_control,
+                "estimated_seconds": estimated_duration_seconds(record.time_control),
                 "colour": side.colour,
                 "username": side.username,
                 "rating": side.rating,
+                "provisional": side.provisional,
                 "opponent_rating": side.opponent_rating,
                 "result": side.result,
                 "ply_count": record.ply_count,
