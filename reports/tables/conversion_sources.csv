@@ -1,0 +1,6 @@
+source,file_present,records,established_chesscom_rapid,established_chesscom_blitz,established_all_of_these,established,notes,established_lichess_rapid,established_lichess_blitz
+chess.com current ratings,True,8486,2788.0,2973.0,1740,"chess.com rapid 2,788, chess.com blitz 2,973, both 1,740","8479 accounts found; 3917 dropped to keep at most 12 per hub account; fit on 1740 people with a recorded discovery cadence, 870 met in each of blitz and rapid games (471 others set aside)",,
+Lichess current ratings,True,23518,,,5385,"Lichess rapid 6,353, Lichess blitz 11,846, both 5,385","5227 closed, flagged or not seen in 2026",6353.0,11846.0
+chess.com same-month snapshots,True,15453,53.0,53.0,53,"chess.com rapid 53, chess.com blitz 53, both 53",,,
+Lichess same-month snapshots,True,7944,,,51,"Lichess rapid 51, Lichess blitz 51, both 51",,51.0,51.0
+linked accounts,True,611,245.0,310.0,93,"chess.com rapid 245, chess.com blitz 310, Lichess rapid 195, Lichess blitz 358, all four 93","726 links, 172 dropped (account closed, flagged or not found)",195.0,358.0

@@ -1,0 +1,8 @@
+rule,rows_removed,rows_left
+collected,0,41024
+accuracy scored on at least 8 moves,943,40081
+"blitz or rapid, with a known clock",0,40081
+rating within 600-2400,363,39718
+rating pool existed that month (Lichess rapid from 2018-01),0,39718
+Lichess rating not provisional,1016,38702
+"at most 3 rows per player, site, year and cadence",14509,24193

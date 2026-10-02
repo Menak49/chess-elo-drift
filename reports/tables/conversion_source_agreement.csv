@@ -1,0 +1,13 @@
+from,to,rating,published_source,published,check_source,check,check_people,difference
+chess.com rapid,chess.com blitz,1000,current-rating survey,782.8584,2026 same-month snapshots,803.9513,51,21.0929
+chess.com rapid,chess.com blitz,1500,current-rating survey,1259.8586,2026 same-month snapshots,1351.283,51,91.4244
+chess.com rapid,chess.com blitz,2000,current-rating survey,1802.3923,2026 same-month snapshots,1922.6093,51,120.217
+chess.com rapid,chess.com blitz,1000,current-rating survey,782.8584,linked accounts,842.7719,171,59.9135
+chess.com rapid,chess.com blitz,1500,current-rating survey,1259.8586,linked accounts,1296.1092,171,36.2506
+chess.com rapid,chess.com blitz,2000,current-rating survey,1802.3923,linked accounts,1932.3538,171,129.9615
+Lichess rapid,Lichess blitz,1000,current-rating survey,934.0822,2026 same-month snapshots,840.8885,51,-93.1937
+Lichess rapid,Lichess blitz,1500,current-rating survey,1420.2028,2026 same-month snapshots,1379.5193,51,-40.6835
+Lichess rapid,Lichess blitz,2000,current-rating survey,1937.6593,2026 same-month snapshots,1931.8927,51,-5.7666
+Lichess rapid,Lichess blitz,1000,current-rating survey,934.0822,linked accounts,920.7727,170,-13.3094
+Lichess rapid,Lichess blitz,1500,current-rating survey,1420.2028,linked accounts,1443.2565,170,23.0537
+Lichess rapid,Lichess blitz,2000,current-rating survey,1937.6593,linked accounts,1947.9962,170,10.3369
