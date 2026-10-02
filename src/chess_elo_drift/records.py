@@ -3,6 +3,10 @@
 One `GameRecord` holds a single game exactly once. A game is an observation of
 *two* players at once, so the per-player view used by the analysis is derived on
 demand through `sides()` rather than stored twice.
+
+A `RatingSnapshot` is what one player's month said about their ratings in both
+cadences at once. It is the raw material of the rapid-to-blitz conversion, and
+it is collected from archives the crawler reads anyway.
 """
 
 from __future__ import annotations
@@ -36,6 +40,20 @@ def count_plies(pgn: str) -> int:
     return len(_MOVE_NUMBER_PATTERN.findall(_COMMENT_PATTERN.sub(" ", movetext)))
 
 
+def estimated_duration_seconds(time_control: str) -> int | None:
+    """Expected length of one player's clock: base + 40 x increment.
+
+    Both sites classify cadences from this quantity, so it is the natural way
+    to compare time controls across them. Returns None for daily or malformed
+    controls.
+    """
+    base, _, increment = time_control.partition("+")
+    try:
+        return int(base) + 40 * int(increment or 0)
+    except ValueError:
+        return None
+
+
 def classify_result(code: str) -> str:
     """Map a chess.com per-side outcome code to `win`, `draw` or `loss`."""
     if code == "win":
@@ -51,7 +69,8 @@ class GameRecord:
 
     game_id: str
     url: str
-    era: str
+    platform: str
+    year: int
     month: str
     time_class: str
     time_control: str
@@ -65,6 +84,10 @@ class GameRecord:
     pgn: str
     reported_accuracy_white: float | None = None
     reported_accuracy_black: float | None = None
+    #: Lichess flags ratings still inside their provisional period; chess.com
+    #: exposes nothing equivalent per game, so this stays None there.
+    white_provisional: bool | None = None
+    black_provisional: bool | None = None
 
     def sides(self) -> Iterator["SideView"]:
         """Yield the two per-player views of this game."""
@@ -107,3 +130,34 @@ class SideView:
     @property
     def reported_accuracy(self) -> float | None:
         return getattr(self.game, f"reported_accuracy_{self.colour}")
+
+    @property
+    def provisional(self) -> bool | None:
+        return getattr(self.game, f"{self.colour}_provisional")
+
+
+@dataclass(frozen=True)
+class RatingSnapshot:
+    """One player's ratings in both cadences, as a single month of games showed them.
+
+    `*_rating` is the rating the player carried *after* their last rated game of
+    that cadence in the month (or on it, where the site does not report the
+    change), and `*_games` how many rated games of that cadence they finished.
+    A cadence the player did not touch that month has rating None and 0 games.
+    """
+
+    platform: str
+    username: str
+    month: str
+    blitz_rating: int | None
+    blitz_games: int
+    rapid_rating: int | None
+    rapid_games: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "RatingSnapshot":
+        fields = {name: payload[name] for name in cls.__dataclass_fields__ if name in payload}
+        return cls(**fields)

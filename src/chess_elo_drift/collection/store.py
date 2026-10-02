@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Iterator
 
-from chess_elo_drift.records import GameRecord
+from chess_elo_drift.records import GameRecord, RatingSnapshot
 
 
 class GameStore:
@@ -78,3 +78,43 @@ class VisitedLog:
 
     def save(self) -> None:
         self.path.write_text(json.dumps(sorted(self._names)), encoding="utf-8")
+
+
+class SnapshotStore:
+    """Append-only JSONL of `RatingSnapshot`s, unique by (username, month).
+
+    The same account can be read in the same month by two crawls -- as a seed
+    and again from the opponent graph -- and must only count once.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._seen: set[tuple[str, str]] = {
+            (snapshot.username, snapshot.month) for snapshot in self.read_all()
+        }
+
+    def __len__(self) -> int:
+        return len(self._seen)
+
+    def add(self, snapshot: RatingSnapshot) -> bool:
+        key = (snapshot.username, snapshot.month)
+        if key in self._seen:
+            return False
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(snapshot.to_dict(), ensure_ascii=False) + "\n")
+        self._seen.add(key)
+        return True
+
+    def read_all(self) -> Iterator[RatingSnapshot]:
+        if not self.path.exists():
+            return
+        with self.path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    yield RatingSnapshot.from_dict(json.loads(line))
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    continue

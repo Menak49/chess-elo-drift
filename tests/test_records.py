@@ -35,7 +35,8 @@ def _record(**overrides) -> GameRecord:
     base = dict(
         game_id="g1",
         url="https://example.invalid/1",
-        era="2018-2019",
+        platform="chesscom",
+        year=2018,
         month="2018-03",
         time_class="blitz",
         time_control="300",
@@ -74,3 +75,15 @@ def test_record_survives_a_serialisation_round_trip():
 def test_from_dict_ignores_unknown_columns():
     payload = _record().to_dict() | {"future_field": 1}
     assert GameRecord.from_dict(payload).game_id == "g1"
+
+
+def test_the_engine_refuses_a_game_that_starts_from_a_set_up_position():
+    from chess_elo_drift.engine.evaluator import _read_mainline
+
+    set_up = (
+        '[SetUp "1"]\n'
+        '[FEN "r1bqkbnr/pppp1ppp/2n5/8/3pP3/2P5/PP3PPP/RNBQKBNR w KQkq - 0 1"]\n\n'
+        "1. cxd4 Nxd4 *"
+    )
+    assert _read_mainline(set_up) is None
+    assert _read_mainline("1. e4 e5 2. Nf3 *") is not None

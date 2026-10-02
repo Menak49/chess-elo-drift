@@ -7,10 +7,10 @@ of sampled players are discovered through games rather than through this module.
 
 Two rules matter for the comparison to stay honest:
 
-* The construction is *identical for both eras*. Seeds are club rosters filtered
+* The construction is *identical for every year*. Seeds are club rosters filtered
   to accounts that already existed when the era began, because an account cannot
-  be sampled in a period that predates it. Applying the same rule on both sides
-  keeps the bootstrap from favouring one era.
+  be sampled in a period that predates it. Applying the same rule to every year
+  keeps the bootstrap from favouring one of them.
 * The filter constrains the *seeds only*. Accounts created during an era are
   still sampled in full, since the crawler reaches them through the games its
   seeds played -- which is precisely the influx of new players the study is
@@ -31,7 +31,7 @@ from chess_elo_drift.config import Era
 logger = logging.getLogger(__name__)
 
 #: Large national and interest clubs whose rosters span the whole rating range
-#: and reach far enough back to seed the 2018-2019 era.
+#: and reach far enough back to seed the earliest years.
 DEFAULT_SEED_CLUBS: tuple[str, ...] = (
     "team-usa", "team-england", "team-germany", "team-spain", "team-brazil",
     "team-netherlands", "team-poland", "team-france", "team-australia",
@@ -49,39 +49,48 @@ def load_seeds_for_era(
     era: Era,
     cache_dir: Path,
     *,
-    rng: random.Random | None = None,
     clubs: tuple[str, ...] = DEFAULT_SEED_CLUBS,
     countries: tuple[str, ...] = DEFAULT_SEED_COUNTRIES,
 ) -> list[str]:
-    """Return the era's seed accounts, club-derived ones first, cached on disk.
+    """Return the era's seed accounts, club-derived ones first.
 
     The returned order is meaningful: the crawler consumes it front to back.
+    The rosters are fetched once and cached; each era then filters the same
+    pool by its own start date, so thirteen years cost one download.
     """
-    rng = rng or random.Random(era.name)
-    cache_path = cache_dir / f"seed_accounts_{era.name}.json"
-    if cache_path.exists():
-        cached = json.loads(cache_path.read_text(encoding="utf-8"))
-        logger.info("[%s] loaded %d cached seed accounts", era.name, len(cached))
-        return cached
-
+    rng = random.Random(era.name)
+    pool = _load_pool(client, cache_dir, clubs, countries)
     cutoff = _era_start_epoch(era)
-    club_seeds: set[str] = set()
-    for club in clubs:
-        members = fetch_club_members_with_dates(client, club)
-        eligible = {name for name, joined in members if joined and joined < cutoff}
-        club_seeds |= eligible
-        logger.info("[%s] club %s: %d/%d members predate the era", era.name, club, len(eligible), len(members))
 
-    country_seeds: set[str] = set()
-    for country in countries:
-        country_seeds |= set(fetch_country_players(client, country))
-    country_seeds -= club_seeds
-
+    club_seeds = {name for name, joined in pool["clubs"] if joined and joined < cutoff}
+    country_seeds = set(pool["countries"]) - club_seeds
     ordered = _shuffled(club_seeds, rng) + _shuffled(country_seeds, rng)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(json.dumps(ordered), encoding="utf-8")
-    logger.info("[%s] %d seeds (%d from clubs)", era.name, len(ordered), len(club_seeds))
+    logger.info("[chesscom %s] %d seeds (%d from clubs)", era.name, len(ordered), len(club_seeds))
     return ordered
+
+
+def _load_pool(
+    client: ChessComClient, cache_dir: Path, clubs: tuple[str, ...], countries: tuple[str, ...]
+) -> dict[str, list]:
+    cache_path = cache_dir / "seed_pool.json"
+    if cache_path.exists():
+        return json.loads(cache_path.read_text(encoding="utf-8"))
+
+    members: dict[str, int] = {}
+    for club in clubs:
+        roster = fetch_club_members_with_dates(client, club)
+        for name, joined in roster:
+            members[name] = min(members.get(name, joined), joined)
+        logger.info("club %s: %d members", club, len(roster))
+
+    country_players: set[str] = set()
+    for country in countries:
+        country_players |= set(fetch_country_players(client, country))
+
+    pool = {"clubs": sorted(members.items()), "countries": sorted(country_players)}
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(pool), encoding="utf-8")
+    return pool
 
 
 def _era_start_epoch(era: Era) -> float:

@@ -26,13 +26,13 @@ def balanced_subsample(
         return pool
 
     rng = random.Random(seed)
-    by_cell: dict[tuple[str, str, int], list[GameRecord]] = defaultdict(list)
+    by_cell: dict[tuple[str, int, str, int], list[GameRecord]] = defaultdict(list)
     for record in pool:
         by_cell[_cell_of(record)].append(record)
     for bucket in by_cell.values():
         rng.shuffle(bucket)
 
-    cells = sorted(by_cell, key=lambda cell: (cell[0], cell[1], cell[2]))
+    cells = sorted(by_cell)
     chosen: list[GameRecord] = []
     depth = 0
     while len(chosen) < max_games:
@@ -50,7 +50,7 @@ def balanced_subsample(
     return chosen
 
 
-def _cell_of(record: GameRecord) -> tuple[str, str, int]:
+def _cell_of(record: GameRecord) -> tuple[str, int, str, int]:
     """The design cell a game belongs to, keyed on its lower-rated side.
 
     A game is one observation per player and the two ratings are close by
@@ -58,12 +58,12 @@ def _cell_of(record: GameRecord) -> tuple[str, str, int]:
     """
     ratings = [record.white_rating, record.black_rating]
     band = band_floor(min(ratings)) or band_floor(max(ratings)) or -1
-    return (record.era, record.time_class, band)
+    return (record.platform, record.year, record.time_class, band)
 
 
-def summarise_cells(records: Sequence[GameRecord]) -> dict[tuple[str, str, int], int]:
+def summarise_cells(records: Sequence[GameRecord]) -> dict[tuple[str, int, str, int], int]:
     """Count games per design cell, for logging what a selection looks like."""
-    counts: dict[tuple[str, str, int], int] = defaultdict(int)
+    counts: dict[tuple[str, int, str, int], int] = defaultdict(int)
     for record in records:
         counts[_cell_of(record)] += 1
     return dict(counts)
