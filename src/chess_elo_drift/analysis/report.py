@@ -1061,6 +1061,14 @@ def _caveats_section() -> str:
             f"{yearly.CHESSCOM_RECLASSIFICATION}, seeding movers' rapid ratings from blitz. The clock control, the "
             "stable-controls check and the before/after trends address the time controls, but the *players* who "
             "followed 10|0 into rapid changed that pool's composition, which no control removes.",
+            "- **Lichess blitz dipped in 2020-2021 and partly recovered.** The year effect drops to -2.22 (2020) "
+            "and -2.23 (2021) from -1.53 (2019), then eases to -0.88 (2022) -- a swing Lichess rapid does not show "
+            "over the same years (+0.27, -0.75), run on the same Glicko-2 engine at the same dates. A dip followed "
+            "by partial recovery, confined to one cadence, argues against a sitewide rating-system change and "
+            "toward a composition effect specific to blitz -- plausibly the covid-era boom in casual play, which "
+            "would land hardest on the cadence beginners use most. The crawl holds sample size roughly constant "
+            "across years by design (549 and 484 players in 2020 and 2021, in line with other years), so this "
+            "reading is a hypothesis, not something the design can confirm or rule out.",
             "- **Lichess rapid only exists from 2018,** and began "
             "([2017-12-01](https://lichess.org/blog/Wh9KWiQAAI5JrKVn/introducing-rapid-ratings)) as a copy of each "
             "player's Classical rating. Before it, the Lichess API labels 10+0 games \"rapid\" by today's speed "
