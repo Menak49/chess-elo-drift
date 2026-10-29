@@ -66,9 +66,21 @@ def _panel_title(platform: str, time_class: str) -> str:
 # -- year by year -----------------------------------------------------------
 
 
-def plot_accuracy_by_year(levels: pd.DataFrame, output_path: Path) -> Path:
-    """Accuracy at fixed ratings, per year, one panel per site and cadence."""
-    title = "What a rating bought, year by year"
+def plot_accuracy_by_year(
+    levels: pd.DataFrame,
+    output_path: Path,
+    *,
+    title: str = "What a rating bought, year by year",
+    subtitle: str | None = None,
+    panel_labels: dict[str, str] | None = None,
+    mark_break: bool = True,
+) -> Path:
+    """Accuracy at fixed ratings, per year, one panel per site and cadence.
+
+    `panel_labels` renames the cadences (the single-clock figure calls them by
+    their clock) and `mark_break` draws chess.com's 10|0 line, which only means
+    something when 10|0 games are in the data.
+    """
     if levels.empty:
         return _placeholder(output_path, title, "Not enough evaluated games to fit any year yet.")
 
@@ -79,7 +91,8 @@ def plot_accuracy_by_year(levels: pd.DataFrame, output_path: Path) -> Path:
         for column, time_class in enumerate(config.TIME_CLASSES):
             axis = axes[row][column]
             panel = levels[(levels["platform"] == platform) & (levels["time_class"] == time_class)]
-            _style_axis(axis, _panel_title(platform, time_class))
+            label = (panel_labels or {}).get(time_class, time_class)
+            _style_axis(axis, f"{config.PLATFORM_LABELS.get(platform, platform)} {label}")
             if panel.empty:
                 _empty_panel(axis)
                 continue
@@ -88,7 +101,7 @@ def plot_accuracy_by_year(levels: pd.DataFrame, output_path: Path) -> Path:
                     _line_with_band(axis, series["year"], series["accuracy"], series["ci_low"], series["ci_high"], colours[rating], f"{rating}")
                 )
             _year_ticks(axis, panel["year"])
-            if platform == "chesscom":
+            if mark_break and platform == "chesscom":
                 _mark_break(axis, panel["year"])
     for axis in axes[-1]:
         axis.set_xlabel("year", color=INK_SECONDARY, fontsize=10)
@@ -98,10 +111,58 @@ def plot_accuracy_by_year(levels: pd.DataFrame, output_path: Path) -> Path:
     _titles(
         figure,
         title,
-        "Engine-recomputed move accuracy of a player at a fixed rating, at a 5+0 blitz or 10+0 rapid clock. "
+        subtitle
+        or "Engine-recomputed move accuracy of a player at a fixed rating, at a 5+0 blitz or 10+0 rapid clock. "
         "Bands: 95% CI, clustered by player. A gap: no fit that year.",
     )
     return _save(figure, output_path, end_labels=ends)
+
+
+def plot_first_study(bands: pd.DataFrame, gaps: pd.DataFrame, output_path: Path) -> Path:
+    """The first study's chart, regenerated: accuracy by rating band in the two eras.
+
+    The original figure was never committed. This redraws it with the same
+    method on today's corpus, and says on the chart itself that it proves nothing.
+    """
+    title = "First study, redrawn: accuracy at a given rating, chess.com, 2018-2019 vs 2024-2025"
+    if bands.empty:
+        return _placeholder(output_path, title, "Not enough chess.com games in both periods to redraw it.")
+
+    classes = [tc for tc in config.TIME_CLASSES if tc in set(bands["time_class"])]
+    figure, axes = _grid(1, len(classes), (5.6, 4.1))
+    eras = sorted(bands["era"].unique())
+    colours = dict(zip(eras, (BLUE, ORANGE)))
+    for axis, time_class in zip(axes[0], classes):
+        panel = bands[bands["time_class"] == time_class]
+        _style_axis(axis, f"chess.com {time_class}")
+        labels = sorted(panel["band_label"].unique(), key=lambda text: int(text.split("-")[0]))
+        for offset, era in zip((-0.09, 0.09), eras):
+            part = panel[panel["era"] == era].set_index("band_label").reindex(labels)
+            axis.errorbar(
+                np.arange(len(labels)) + offset, part["mean_accuracy"], yerr=part["sem"], fmt="o",
+                color=colours[era], markersize=6, markeredgecolor=SURFACE, capsize=3, linewidth=1.4,
+            )
+        axis.set_xticks(range(len(labels)), labels)
+        axis.set_xlabel("rating band", color=INK_SECONDARY, fontsize=10)
+        gap = gaps[(gaps["time_class"] == time_class) & (gaps["specification"] == "original")]
+        if not gap.empty:
+            axis.text(
+                0.03, 0.96, f"gap by the first method: {gap['gap'].iloc[0]:+.2f} points",
+                transform=axis.transAxes, fontsize=9, color=INK_SECONDARY, va="top",
+            )
+        axis.text(
+            0.5, 0.5, "REGENERATED, NOT THE ORIGINAL\nWORTHLESS AS EVIDENCE", transform=axis.transAxes,
+            fontsize=14, color="#b0201a", alpha=0.35, ha="center", va="center", rotation=22, weight="bold",
+        )
+    axes[0][0].set_ylabel("mean accuracy (%)", color=INK_SECONDARY, fontsize=10)
+    _legend(figure, [(colours[era], era) for era in eras])
+    _titles(
+        figure,
+        title,
+        "First study's method on today's larger corpus: no control for the clock, so the 10|0 games that "
+        "chess.com moved from blitz to rapid in 2020 distort the comparison. Bars: one standard error.",
+    )
+    return _save(figure, output_path)
 
 
 def plot_trend_robustness(trends: pd.DataFrame, output_path: Path) -> Path:

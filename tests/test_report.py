@@ -25,8 +25,12 @@ EXPECTED_TABLES = {
     "slope_drift", "band_by_year", "site_offsets", "conversion_formulas", "conversion_table",
     "conversion_chains", "conversion_source_agreement", "conversion_accuracy_check",
     "conversion_benchmark", "conversion_sources", "reported_accuracy_coverage",
+    "first_study_gaps", "first_study_composition", "first_study_bands",
 }
-EXPECTED_FIGURES = {"accuracy_by_year", "trend_robustness", "site_offsets", "conversion", "reported_accuracy_coverage"}
+EXPECTED_FIGURES = {
+    "accuracy_by_year", "trend_robustness", "site_offsets", "conversion", "reported_accuracy_coverage",
+    "first_study",
+}
 
 FAST = {"site_replicates": 20, "conversion_replicates": 40}
 

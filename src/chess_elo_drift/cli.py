@@ -20,6 +20,11 @@ from contextlib import ExitStack
 from pathlib import Path
 
 from chess_elo_drift import config
+from chess_elo_drift.collection.focus import (
+    FocusedSource,
+    import_existing_evaluations,
+    import_existing_games,
+)
 from chess_elo_drift.collection.sampler import CoverageTarget, StratifiedSnowballCrawler
 from chess_elo_drift.collection.store import GameStore, SnapshotStore, VisitedLog
 from chess_elo_drift.engine.results import EvaluationWriter
@@ -62,7 +67,7 @@ def parse_platforms(text: str) -> tuple[str, ...]:
     return (text,)
 
 
-def _open_platform(platform: str, stack: ExitStack, min_interval: float):
+def _open_platform(platform: str, stack: ExitStack, min_interval: float, focus: bool = False):
     """Return the site's `GameSource` and a seed loader for it."""
     if platform == "chesscom":
         from chess_elo_drift.chesscom import ChessComClient
@@ -81,7 +86,8 @@ def _open_platform(platform: str, stack: ExitStack, min_interval: float):
     client = stack.enter_context(LichessClient(min_interval_seconds=min_interval))
     # The crawler keeps at most a few games per player and cell, and anonymous
     # exports stream at ~11 games/s, so reading a whole busy month is wasted time.
-    return LichessSource(client, max_games_per_month=40), lambda era: load_lichess_seeds(
+    # The single-clock corpus keeps one game in several, so it reads whole months.
+    return LichessSource(client, max_games_per_month=100 if focus else 40), lambda era: load_lichess_seeds(
         client, era, config.raw_dir(platform)
     )
 
@@ -90,19 +96,30 @@ def run_collect(args: argparse.Namespace) -> int:
     """Crawl each requested site and year until every rating band meets its quota."""
     logger = logging.getLogger("collect")
 
+    focus = args.focus
+    rating_max = config.FOCUS_RATING_MAX if focus else config.RATING_MAX
     for platform in args.platform:
-        snapshots = SnapshotStore(config.snapshots_path(platform))
+        snapshots = None if focus else SnapshotStore(config.snapshots_path(platform))
         with ExitStack() as stack:
-            source, load_seeds = _open_platform(platform, stack, args.min_interval)
+            source, load_seeds = _open_platform(platform, stack, args.min_interval, focus)
+            if focus:
+                source = FocusedSource(source)
             for year in args.years:
                 era = config.era_for_year(year)
                 time_classes = tuple(
                     tc for tc in config.TIME_CLASSES
                     if config.pool_exists(platform, tc, min(era.months))
                 )
-                store = GameStore(config.games_path(platform, year))
-                visited = VisitedLog(config.visited_path(platform, year))
-                target = CoverageTarget(args.per_cell, time_classes=time_classes, months=era.months)
+                store = GameStore(config.games_path(platform, year, focus))
+                visited = VisitedLog(config.visited_path(platform, year, focus))
+                if focus:
+                    logger.info(
+                        "%s %s: %d games reused from the main corpus",
+                        platform, year, import_existing_games(platform, year, store),
+                    )
+                target = CoverageTarget(
+                    args.per_cell, time_classes=time_classes, months=era.months, rating_max=rating_max
+                )
                 target.prime(store.read_all())
                 if target.is_complete:
                     logger.info("%s %s already complete (%s)", platform, year, target.progress)
@@ -117,6 +134,7 @@ def run_collect(args: argparse.Namespace) -> int:
                     max_api_requests=args.max_requests,
                     visited=visited,
                     snapshots=snapshots,
+                    stall_requests=1500 if focus else 300,
                 )
                 logger.info(
                     "crawling %s %s (%s): target %d per cell, resuming from %d games "
@@ -129,7 +147,7 @@ def run_collect(args: argparse.Namespace) -> int:
                 finally:
                     visited.save()
                 logger.info("%s %s done: %s", platform, year, stats.as_dict())
-                config.crawl_stats_path(platform, year).write_text(
+                config.crawl_stats_path(platform, year, focus).write_text(
                     json.dumps(stats.as_dict(), indent=2), encoding="utf-8"
                 )
     return 0
@@ -149,12 +167,16 @@ def run_survey(args: argparse.Namespace) -> int:
     return 0
 
 
-def load_corpus(platforms: tuple[str, ...] = config.PLATFORMS, years: tuple[int, ...] = config.YEARS):
+def load_corpus(
+    platforms: tuple[str, ...] = config.PLATFORMS,
+    years: tuple[int, ...] = config.YEARS,
+    focus: bool = False,
+):
     return [
         record
         for platform in platforms
         for year in years
-        for record in GameStore(config.games_path(platform, year)).read_all()
+        for record in GameStore(config.games_path(platform, year, focus)).read_all()
     ]
 
 
@@ -162,7 +184,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     """Re-analyse every collected game with the engine and store move quality."""
     logger = logging.getLogger("evaluate")
 
-    records = load_corpus()
+    records = load_corpus(focus=args.focus)
     logger.info("corpus holds %d games", len(records))
 
     selected = balanced_subsample(records, args.limit)
@@ -170,7 +192,16 @@ def run_evaluate(args: argparse.Namespace) -> int:
         logger.info("selected %d games, balanced across the design", len(selected))
     logger.debug("cell sizes: %s", summarise_cells(selected))
 
-    writer = EvaluationWriter(config.EVALUATIONS_PATH)
+    if args.focus:
+        reused = import_existing_evaluations(
+            config.FOCUS_EVALUATIONS_PATH,
+            config.EVALUATIONS_PATH,
+            {record.game_id for record in selected},
+        )
+        logger.info("%d engine rows reused from the main corpus", reused)
+    writer = EvaluationWriter(
+        config.FOCUS_EVALUATIONS_PATH if args.focus else config.EVALUATIONS_PATH
+    )
     evaluate_corpus(
         selected,
         writer,
@@ -187,6 +218,9 @@ def run_report(args: argparse.Namespace) -> int:
 
     artifacts = generate_report(
         evaluations_path=args.evaluations or config.EVALUATIONS_PATH,
+        focus_evaluations_path=(
+            config.FOCUS_EVALUATIONS_PATH if config.FOCUS_EVALUATIONS_PATH.exists() else None
+        ),
         max_per_player=args.max_per_player,
     )
     logging.getLogger("report").info("findings: %s", artifacts.findings)
@@ -220,6 +254,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="minimum seconds between two API calls (raise it if throttled)",
     )
     collect.add_argument("--seed", type=int, default=20142026, help="RNG seed")
+    collect.add_argument(
+        "--focus", action="store_true",
+        help="single-clock corpus: only 3+0 and 15+10 games, ratings up to "
+        f"{config.FOCUS_RATING_MAX}, stored apart from the main corpus",
+    )
     collect.set_defaults(handler=run_collect)
 
     survey = subcommands.add_parser(
@@ -246,6 +285,9 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--limit", type=int, default=0,
         help="cap on games to score, spread evenly across the design (0 = all)",
+    )
+    evaluate.add_argument(
+        "--focus", action="store_true", help="score the single-clock corpus instead"
     )
     evaluate.add_argument("--engine", type=Path, default=config.ENGINE_PATH, help="UCI engine binary")
     evaluate.set_defaults(handler=run_evaluate)

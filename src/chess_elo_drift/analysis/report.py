@@ -17,7 +17,9 @@ import numpy as np
 import pandas as pd
 
 from chess_elo_drift import config
-from chess_elo_drift.analysis import conversion, plots, sites, yearly
+import re
+
+from chess_elo_drift.analysis import conversion, parts, plots, sites, yearly
 from chess_elo_drift.analysis.dataset import (
     MAX_OBSERVATIONS_PER_PLAYER,
     REFERENCE_CLOCK_SECONDS,
@@ -73,6 +75,8 @@ class Results:
     sources: pd.DataFrame
     coverage: pd.DataFrame
     validation: dict[str, float]
+    first_study: parts.FirstStudyResults
+    focus: parts.FocusResults | None = None
     max_per_player: int = MAX_OBSERVATIONS_PER_PLAYER
     site_replicates: int = sites.DEFAULT_BOOTSTRAP_REPLICATES
 
@@ -81,6 +85,7 @@ def generate_report(
     evaluations_path: Path | None = None,
     max_per_player: int = MAX_OBSERVATIONS_PER_PLAYER,
     *,
+    focus_evaluations_path: Path | None = None,
     data_raw: Path | None = None,
     output_root: Path | None = None,
     site_replicates: int = sites.DEFAULT_BOOTSTRAP_REPLICATES,
@@ -88,6 +93,9 @@ def generate_report(
     seed: int = SEED,
 ) -> ReportArtifacts:
     """Run every comparison and write tables, figures and the findings note.
+
+    `focus_evaluations_path` is the engine output of the single-clock corpus (part
+    one of the findings); without it part one says it has not been run.
 
     `data_raw` is where the rating snapshots (`<platform>/rating_snapshots.jsonl`)
     and the conversion survey (`conversion/*.jsonl`) are read from; it and
@@ -103,6 +111,7 @@ def generate_report(
     results = compute(
         evaluations,
         load_conversion_inputs(data_raw),
+        focus_evaluations=load_evaluations(focus_evaluations_path) if focus_evaluations_path else None,
         max_per_player=max_per_player,
         site_replicates=site_replicates,
         conversion_replicates=conversion_replicates,
@@ -111,6 +120,10 @@ def generate_report(
 
     tables = {name: _write_table(frame, tables_dir / f"{name}.csv") for name, frame in _table_frames(results).items()}
     figures = {
+        **_focus_figures(results, figures_dir),
+        "first_study": plots.plot_first_study(
+            results.first_study.bands, results.first_study.gaps, figures_dir / "first_study_redrawn.png"
+        ),
         "accuracy_by_year": plots.plot_accuracy_by_year(results.levels, figures_dir / "accuracy_by_year.png"),
         "trend_robustness": plots.plot_trend_robustness(results.trends, figures_dir / "trend_robustness.png"),
         "site_offsets": plots.plot_site_offsets(sites.offsets_at(results.offsets), figures_dir / "site_offsets.png"),
@@ -130,6 +143,7 @@ def compute(
     evaluations: pd.DataFrame,
     inputs,
     *,
+    focus_evaluations: pd.DataFrame | None = None,
     max_per_player: int = MAX_OBSERVATIONS_PER_PLAYER,
     site_replicates: int = sites.DEFAULT_BOOTSTRAP_REPLICATES,
     conversion_replicates: int = conversion.DEFAULT_BOOTSTRAP_REPLICATES,
@@ -158,13 +172,44 @@ def compute(
         sources=_sources_frame(conversions),
         coverage=coverage_of_reported_accuracy(evaluations),
         validation=validate_against_reported(sample[sample["platform"] == "chesscom"] if not sample.empty else sample),
+        first_study=parts.compute_first_study(sample),
+        focus=parts.compute_focus(focus_evaluations, max_per_player) if focus_evaluations is not None else None,
         max_per_player=max_per_player,
         site_replicates=site_replicates,
     )
 
 
-def _table_frames(results: Results) -> dict[str, pd.DataFrame]:
+def _focus_figures(results: Results, figures_dir: Path) -> dict[str, Path]:
+    if results.focus is None:
+        return {}
     return {
+        "focus_by_year": plots.plot_accuracy_by_year(
+            results.focus.levels,
+            figures_dir / "focus_accuracy_by_year.png",
+            title="Part 1: what a rating bought on one clock, year by year",
+            subtitle="3+0 blitz and 15+10 rapid only, so the clock is the same every year. Engine-recomputed "
+            "move accuracy of a player at a fixed rating. Bands: 95% CI, clustered by player.",
+            panel_labels=parts.FOCUS_LABELS,
+            mark_break=False,
+        ),
+    }
+
+
+def _table_frames(results: Results) -> dict[str, pd.DataFrame]:
+    focus = {}
+    if results.focus is not None:
+        focus = {
+            "focus_sample_attrition": results.focus.attrition,
+            "focus_sample_sizes": results.focus.sizes,
+            "focus_year_effects": results.focus.effects,
+            "focus_accuracy_at_ratings": results.focus.levels,
+            "focus_year_trends": results.focus.trends,
+        }
+    return {
+        **focus,
+        "first_study_gaps": results.first_study.gaps,
+        "first_study_composition": results.first_study.composition,
+        "first_study_bands": results.first_study.bands,
         "sample_attrition": results.attrition,
         "sample_sizes": results.sizes,
         "year_effects": results.effects,
@@ -208,7 +253,8 @@ def _sources_frame(conversions: conversion.ConversionResults) -> pd.DataFrame:
 
 
 def render_findings(results: Results, tables: dict[str, Path], figures: dict[str, Path]) -> str:
-    sections = [
+    first, last = config.YEARS[0], config.YEARS[-1]
+    full_corpus = [
         _title_block(results),
         "## The answers\n",
         _headline_years(results),
@@ -222,15 +268,39 @@ def render_findings(results: Results, tables: dict[str, Path], figures: dict[str
         _bands_section(results),
         _instrument_section(results, figures),
         _caveats_section(),
+    ]
+    sections = [
+        f"# What does a chess rating buy? chess.com and Lichess, {first}-{last}\n",
+        _overview(),
+        _part_one(results, figures),
+        "## Part 2. The full corpus: every cadence, with the clock controlled\n",
+        *(_demote(section) for section in full_corpus),
+        _part_three(results, figures),
         _files_section(tables, figures),
     ]
     return "\n".join(section.rstrip() + "\n" for section in sections)
 
 
+def _demote(section: str) -> str:
+    """Push every heading of `section` one level down, so it nests under its part."""
+    return re.sub(r"(?m)^(#{1,5}) ", r"#\1 ", section)
+
+
+def _overview() -> str:
+    return (
+        "The study has three parts, from the simplest to the most detailed.\n\n"
+        "1. **One clock.** Only 3+0 blitz and 15+10 rapid games, on both sites. With the clock identical every "
+        "year there is nothing to correct for, so the comparison is direct.\n"
+        "2. **The full corpus.** Every blitz and rapid game, all clocks mixed, with the clock controlled in the "
+        "models. It reaches higher ratings, adds the site-to-site comparison and the 2026 conversion tables.\n"
+        "3. **The first study, and why it was wrong.** The first version of the study found that ratings had "
+        "become easier to reach. Chess.com's reclassification of 10|0 in 2020 explains most of that result.\n"
+    )
+
+
 def _title_block(results: Results) -> str:
     sample = results.sample
-    first, last = config.YEARS[0], config.YEARS[-1]
-    lines = [f"# What does a chess rating buy? chess.com and Lichess, {first}-{last}\n"]
+    lines = []
     if sample.empty:
         lines.append("_No evaluated game has passed the inclusion rules yet, so the year-by-year and site comparisons below are empty._\n")
     else:
@@ -1089,6 +1159,193 @@ def _caveats_section() -> str:
             "a common opponent; the conversion formulas equate people, not moves. Where the two agree, both are "
             "more credible.",
         ]
+    )
+
+
+# -- part one: one clock ------------------------------------------------------
+
+
+def _part_one(results: Results, figures: dict[str, Path]) -> str:
+    focus = results.focus
+    lines = [
+        "## Part 1. One clock: 3+0 blitz and 15+10 rapid\n",
+        "Only games played at 3+0 (blitz) or 15+10 (rapid), on chess.com and on Lichess, rated up to "
+        f"{config.FOCUS_RATING_MAX} (15+10 is rare above). Within a cadence the clock never changes, so a year "
+        "cannot look stronger because its games were longer, and chess.com's 2020 reclassification of 10|0 does "
+        "not touch either clock. The engine, the accuracy and the regression are those of part 2, minus the "
+        "clock term, which has nothing left to control.\n",
+    ]
+    if focus is None:
+        lines.append("_The single-clock corpus has not been collected and evaluated yet (`collect --focus`, `evaluate --focus`)._")
+        return "\n".join(lines) + "\n"
+
+    main = focus.trends
+    if main.empty:
+        lines.append("_Too few evaluated single-clock games to fit any trend yet._")
+        return "\n".join(lines) + "\n"
+
+    lines.append("**What it shows** (accuracy points per year at a fixed rating; positive = the same rating plays better):\n")
+    for row in main.itertuples():
+        label = f"{config.PLATFORM_LABELS.get(row.platform, row.platform)} {parts.FOCUS_LABELS[row.time_class]}"
+        text = (
+            f"- **{label}** ({row.first_year}-{row.last_year}): {yearly.verdict(pd.Series(row._asdict()))} "
+            f"({row.trend_per_year:+.3f} per year, 95% CI {row.ci_low:+.3f} to {row.ci_high:+.3f})."
+        )
+        first = _first_year_effect(focus.effects, row.platform, row.time_class)
+        if first is not None:
+            text += (
+                f" A rating of {yearly.REFERENCE_RATINGS[1]} in {first.year} played {abs(first.effect):.2f} points "
+                f"{'more' if first.effect > 0 else 'less'} accurately than the same rating in {first.reference_year} "
+                f"(95% CI {first.ci_low:+.2f} to {first.ci_high:+.2f})."
+            )
+        lines.append(text)
+    lines.append(
+        "\nNegative means ratings have become easier to reach: the same number buys less accurate play now. "
+        "An accuracy point is worth very roughly 100-250 rating points, so differences under about half a point "
+        "are within the noise of this design.\n"
+    )
+    if "focus_by_year" in figures:
+        lines.append(f"![accuracy by year, one clock]({_relative(figures['focus_by_year'])})\n")
+
+    if not focus.sizes.empty:
+        sizes = focus.sizes.assign(
+            pool=[
+                f"{config.PLATFORM_LABELS.get(p, p)} {parts.FOCUS_LABELS[t]}"
+                for p, t in zip(focus.sizes["platform"], focus.sizes["time_class"])
+            ]
+        )
+        lines += [
+            "**Observations per year** (player-sides after the inclusion rules; a thin pool is less reliable):\n",
+            _markdown(sizes.pivot(index="year", columns="pool", values="observations").fillna(0).astype(int).reset_index()),
+        ]
+    if not focus.effects.empty:
+        effects = focus.effects.assign(
+            cell=[
+                f"{config.PLATFORM_LABELS.get(p, p)} {parts.FOCUS_LABELS[t]}"
+                for p, t in zip(focus.effects["platform"], focus.effects["time_class"])
+            ],
+            text=[
+                "reference" if r.year == r.reference_year else _signed_ci(r.effect, r.ci_low, r.ci_high)
+                for r in focus.effects.itertuples()
+            ],
+        )
+        lines += [
+            "\n**Each year against the reference year** (accuracy points at the same rating; positive = that year's "
+            "players were more accurate than today's):\n",
+            _markdown(effects.pivot(index="year", columns="cell", values="text").fillna("").reset_index()),
+        ]
+    lines.append(
+        "\nPart 1 deliberately stops here: the cells are smaller than in part 2 (one clock instead of all of them), "
+        "so it says *which way and roughly how much* and leaves the finer questions (rating slope, robustness, "
+        "site-to-site offsets) to part 2."
+    )
+    return "\n".join(lines) + "\n"
+
+
+# -- part three: the first study ----------------------------------------------
+
+
+def _part_three(results: Results, figures: dict[str, Path]) -> str:
+    study = results.first_study
+    modern = list(parts.FIRST_STUDY_ERAS)[-1]
+    legacy = list(parts.FIRST_STUDY_ERAS)[0]
+    lines = [
+        "## Part 3. The first study, and what chess.com's 2020 reclassification did to it\n",
+        f"**The first version.** The study began as a chess.com-only comparison of {legacy} with {modern}, ratings "
+        f"{config.RATING_MIN}-{parts.FIRST_STUDY_RATING_MAX}, one regression per cadence "
+        "(`accuracy ~ era + rating + rating²`, no clock term). On its first, small sample (1,507 player-observations) "
+        f"it found that players of the same rating played worse in {modern}: "
+        f"{parts.FIRST_REPORT_GAPS['blitz']:+.2f} accuracy points in blitz and {parts.FIRST_REPORT_GAPS['rapid']:+.2f} "
+        "in rapid, worth very roughly -350 and -230 rating points. The reading was that chess.com ratings had "
+        "become easier to reach. **That conclusion was wrong,** or at least not supported.\n",
+        "**The problem.** On 2020-09-10 chess.com reclassified 10|0 from blitz to rapid "
+        "([announcement](https://www.chess.com/news/view/10-minute-chess-now-rapid-rated-bullet-ratings-increased)). "
+        "Games are filed by the class they were rated in, so the two periods are not made of the same games: before, "
+        "\"rapid\" was essentially 15-minute-plus play and 10|0 sat in blitz; after, 10|0 is the bulk of \"rapid\". "
+        "Shorter games are played less accurately whatever the rating, so \"rapid\" in the later period looked worse "
+        "for a reason that has nothing to do with rating inflation. The first study compared two cadences whose "
+        "contents had changed underneath them.\n",
+    ]
+    if study.gaps.empty:
+        lines.append("_There are not enough chess.com games in both periods to redo the comparison here._")
+        return "\n".join(lines) + "\n"
+
+    if not study.composition.empty:
+        view = pd.DataFrame(
+            {
+                "cadence": study.composition["time_class"],
+                "period": study.composition["era"],
+                "observations": study.composition["observations"],
+                "share of games at 10|0": [f"{v:.0%}" for v in study.composition["share_10_0"]],
+                "mean clock (minutes per side)": [f"{v:.1f}" for v in study.composition["mean_clock_minutes"]],
+            }
+        )
+        lines += ["**What the two periods are made of** (chess.com, today's corpus):\n", _markdown(view)]
+
+    wide = (
+        study.gaps.assign(text=[_signed_ci(r.gap, r.ci_low, r.ci_high) for r in study.gaps.itertuples()])
+        .pivot(index="label", columns="time_class", values="text")
+        .reindex(list(parts.SPECS.values()))
+        .dropna(how="all")
+    )
+    lines += [
+        f"\n**The same comparison, redone on today's larger corpus** ({modern} minus {legacy}, accuracy points at the "
+        "same rating; negative = the same rating plays worse now):\n",
+        _markdown(wide.reset_index().rename(columns={"label": "method"})),
+    ]
+    lines.append(_first_study_reading(study))
+    lines.append(
+        "\n**The figure.** The first report's chart was never saved to the repository, so it cannot be recovered. "
+        "The one below is **redrawn** with the first study's method on today's corpus. It is **not the original, "
+        "and it is worthless as evidence**: it shows exactly the comparison that was flawed, which is why it is "
+        "stamped on the chart.\n"
+    )
+    lines.append(f"![the first study, redrawn]({_relative(figures['first_study'])})\n")
+    lines.append(
+        "**What replaced it.** Parts 1 and 2 hold the clock fixed (part 1 by construction, part 2 by regression and "
+        "by a check restricted to time controls chess.com never reclassified), and part 2 fits chess.com on each "
+        "side of the break. What survives is much smaller than the first study's headline."
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _first_study_reading(study: parts.FirstStudyResults) -> str:
+    """What each cadence's gap does once the games are made comparable, in words."""
+    lines = []
+    for time_class in config.TIME_CLASSES:
+        rows = study.gaps[study.gaps["time_class"] == time_class].set_index("specification")
+        if "original" not in rows.index:
+            continue
+        original = rows.loc["original"]
+        first = parts.FIRST_REPORT_GAPS.get(time_class)
+        if original["ci_low"] <= 0 <= original["ci_high"]:
+            lines.append(
+                f"- **{time_class}:** on the larger corpus the first method finds no gap ({original['gap']:+.2f}, "
+                f"{original['ci_low']:+.2f} to {original['ci_high']:+.2f}); the {first:+.2f} of the first report was "
+                "a small-sample result that did not hold up."
+            )
+            continue
+        text = f"- **{time_class}:** the first method still finds {original['gap']:+.2f} ({original['ci_low']:+.2f} to {original['ci_high']:+.2f})"
+        if "clock" in rows.index:
+            clock = rows.loc["clock"]
+            text += f"; holding the clock fixed by regression leaves {clock['gap']:+.2f} ({clock['ci_low']:+.2f} to {clock['ci_high']:+.2f})"
+        if "stable" in rows.index:
+            stable = rows.loc["stable"]
+            gone = stable["ci_low"] <= 0 <= stable["ci_high"]
+            text += (
+                f"; comparing only time controls that never changed class gives {stable['gap']:+.2f} "
+                f"({stable['ci_low']:+.2f} to {stable['ci_high']:+.2f})"
+                + (", which is no gap at all" if gone else ", a gap that remains")
+            )
+        lines.append(text + ".")
+    if not lines:
+        return ""
+    return (
+        "\n" + "\n".join(lines) + "\n\nThe regression alone cannot fully repair the comparison, because the two periods "
+        "barely overlap in clock (long games before, 10|0 after) and it has to extrapolate across the gap; "
+        "only the like-for-like comparison is clean. It is also a sample of different people: those who followed "
+        "10|0 into rapid are not those who played 15-minute games. Where the gap vanishes in the like-for-like "
+        "row, the reclassification explains it and rating drift does not.\n"
     )
 
 
