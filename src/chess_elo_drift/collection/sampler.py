@@ -33,17 +33,21 @@ logger = logging.getLogger(__name__)
 Cell = tuple[str, int]
 
 
-def band_floor(rating: int, width: int = config.CRAWL_BAND_WIDTH) -> int | None:
+def band_floor(
+    rating: int, width: int = config.CRAWL_BAND_WIDTH, rating_max: int = config.RATING_MAX
+) -> int | None:
     """Return the lower bound of the band holding `rating`, or None if out of range."""
-    if not config.RATING_MIN <= rating <= config.RATING_MAX:
+    if not config.RATING_MIN <= rating <= rating_max:
         return None
     offset = (rating - config.RATING_MIN) // width * width
-    return config.RATING_MIN + min(offset, config.RATING_MAX - config.RATING_MIN - width)
+    return config.RATING_MIN + min(offset, rating_max - config.RATING_MIN - width)
 
 
-def study_bands(width: int = config.CRAWL_BAND_WIDTH) -> tuple[int, ...]:
+def study_bands(
+    width: int = config.CRAWL_BAND_WIDTH, rating_max: int = config.RATING_MAX
+) -> tuple[int, ...]:
     """Every band floor covering the rating window under study."""
-    return tuple(range(config.RATING_MIN, config.RATING_MAX, width))
+    return tuple(range(config.RATING_MIN, rating_max, width))
 
 
 class CoverageTarget:
@@ -66,9 +70,11 @@ class CoverageTarget:
         *,
         time_classes: tuple[str, ...] = config.TIME_CLASSES,
         months: Iterable[YearMonth] | None = None,
+        rating_max: int = config.RATING_MAX,
     ) -> None:
         self.observations_per_cell = observations_per_cell
-        self.bands = study_bands(width)
+        self.rating_max = rating_max
+        self.bands = study_bands(width, rating_max)
         self.time_classes = time_classes
         self.months: tuple[str | None, ...] = (
             tuple(str(month) for month in months) if months else (None,)
@@ -112,7 +118,7 @@ class CoverageTarget:
         """
         for record in records:
             for side in record.sides():
-                band = band_floor(side.rating)
+                band = band_floor(side.rating, rating_max=self.rating_max)
                 if band is not None:
                     self.credit((record.time_class, band), record.month)
 
@@ -391,7 +397,7 @@ class StratifiedSnowballCrawler:
     def _discover(self, record: GameRecord) -> None:
         """Queue both players of a game as future candidates, in their own band."""
         for side in record.sides():
-            band = band_floor(side.rating)
+            band = band_floor(side.rating, rating_max=self._target.rating_max)
             if band is None or side.username in self._visited or side.username in self._queued:
                 continue
             self._frontier[band].append(side.username)
@@ -401,7 +407,7 @@ class StratifiedSnowballCrawler:
         """Store the game if either side fills a cell that still wants observations."""
         creditable: set[Cell] = set()
         for side in record.sides():
-            band = band_floor(side.rating)
+            band = band_floor(side.rating, rating_max=self._target.rating_max)
             if band is None:
                 continue
             cell = (record.time_class, band)
@@ -419,7 +425,7 @@ class StratifiedSnowballCrawler:
             self.stats.accuracy_field_present += 1
 
         for side in record.sides():
-            band = band_floor(side.rating)
+            band = band_floor(side.rating, rating_max=self._target.rating_max)
             if band is None:
                 continue
             cell = (record.time_class, band)

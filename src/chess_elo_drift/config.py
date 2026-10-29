@@ -184,31 +184,53 @@ BACKOFF_BASE_SECONDS = 2.0
 LICHESS_RATE_LIMIT_PAUSE_SECONDS = 61.0
 
 
+# --- The single-clock comparison ---------------------------------------------
+
+#: Part one of the study compares years with one clock per cadence, so that no
+#: control for the clock is needed: 3+0 for blitz and 15+10 for rapid. The strings
+#: are the two sites' own spellings of the same clocks (chess.com writes 3+0 as
+#: "180", Lichess as "180+0").
+FOCUS_TIME_CONTROLS: dict[str, frozenset[str]] = {
+    "blitz": frozenset({"180", "180+0"}),
+    "rapid": frozenset({"900+10"}),
+}
+
+#: 15+10 is barely played above this rating, so the whole single-clock corpus
+#: stops here and both clocks cover the same ratings.
+FOCUS_RATING_MAX = 2000
+
+FOCUS_DIR = DATA_RAW / "focus"
+
+
 # --- Where each stage writes ------------------------------------------------
 
 
-def raw_dir(platform: str) -> Path:
-    """Raw collected data for one site: games, visited accounts, snapshots."""
-    return DATA_RAW / platform
+def raw_dir(platform: str, focus: bool = False) -> Path:
+    """Raw collected data for one site: games, visited accounts, snapshots.
+
+    `focus` selects the separate corpus of the single-clock comparison.
+    """
+    return (FOCUS_DIR if focus else DATA_RAW) / platform
 
 
-def games_path(platform: str, year: int) -> Path:
-    return raw_dir(platform) / f"games_{year}.jsonl"
+def games_path(platform: str, year: int, focus: bool = False) -> Path:
+    return raw_dir(platform, focus) / f"games_{year}.jsonl"
 
 
-def visited_path(platform: str, year: int) -> Path:
-    return raw_dir(platform) / f"visited_{year}.json"
+def visited_path(platform: str, year: int, focus: bool = False) -> Path:
+    return raw_dir(platform, focus) / f"visited_{year}.json"
 
 
 def snapshots_path(platform: str) -> Path:
     return raw_dir(platform) / "rating_snapshots.jsonl"
 
 
-def crawl_stats_path(platform: str, year: int) -> Path:
-    return raw_dir(platform) / f"crawl_stats_{year}.json"
+def crawl_stats_path(platform: str, year: int, focus: bool = False) -> Path:
+    return raw_dir(platform, focus) / f"crawl_stats_{year}.json"
 
 
 EVALUATIONS_PATH = DATA_PROCESSED / "evaluations.csv"
+FOCUS_EVALUATIONS_PATH = DATA_PROCESSED / "evaluations_focus.csv"
 
 #: Current-rating surveys and cross-site account links for the conversion study.
 CONVERSION_DIR = DATA_RAW / "conversion"
