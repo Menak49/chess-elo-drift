@@ -149,7 +149,27 @@ worker whose engine dies starts a fresh one. `--workers` sets the parallelism
 (lower it on a machine short of memory); `--limit N` spends a fixed engine budget
 on a subsample spread evenly across the design.
 
-**report** builds the estimation sample, runs every comparison and writes:
+**The single-clock corpus (part 1 of the findings).** The findings open with a
+simple comparison on one clock per cadence, 3+0 blitz and 15+10 rapid, so no clock
+correction is needed. It has its own corpus, kept apart from the main one:
+
+```bash
+python -m chess_elo_drift.cli collect  --focus --platform chesscom --per-cell 24 --max-requests 2000
+python -m chess_elo_drift.cli collect  --focus --platform lichess  --per-cell 24 --max-requests 2000
+python -m chess_elo_drift.cli evaluate --focus    # -> data/processed/evaluations_focus.csv
+python -m chess_elo_drift.cli report              # picks the focus file up when it exists
+```
+
+`--focus` keeps only games on those two clocks and ratings up to
+`config.FOCUS_RATING_MAX` (15+10 is rare above 2000), stores them under
+`data/raw/focus/`, and reuses the 3+0 and 15+10 games (and their engine scores)
+the main crawl had already met. The same one-Lichess-job rule applies.
+
+**report** builds the estimation sample, runs every comparison and writes the
+findings in three parts: (1) the single-clock comparison, (2) the full corpus with
+the clock controlled, and (3) the first version of the study and how chess.com's
+2020 reclassification of 10|0 distorted it, with its chart redrawn and stamped as
+not the original. It writes:
 
 ```
 reports/findings.md                # the answers, with method and caveats
@@ -167,7 +187,8 @@ src/chess_elo_drift/
   selection.py        spending a fixed engine budget evenly across the design
   chesscom/           chess.com client and endpoint wrappers
   lichess/            Lichess client, game export, extraction and seeding
-  collection/         the stratified snowball crawler, its sources and stores
+  collection/         the stratified snowball crawler, its sources and stores,
+                      and the 3+0 / 15+10 filter of the single-clock corpus
   conversion/         the 2026 rating survey and cross-site account links
   engine/             UCI analysis, accuracy/ACPL scoring, parallel runner
   analysis/           estimation sample, yearly models, site equating,
