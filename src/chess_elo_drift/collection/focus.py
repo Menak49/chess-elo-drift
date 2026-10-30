@@ -1,10 +1,10 @@
-"""The single-clock corpus: only 3+0 blitz and 15+10 rapid games.
+"""The single-clock corpus: only 3+0 blitz and one rapid clock per site (15+10, 10+0 on Lichess).
 
 Part one of the study compares years on one clock per cadence, so nothing has to
 be corrected for the mix of time controls. The sites cannot filter an export by
 clock, so a `FocusedSource` reads what the wrapped source returns and keeps the
 games on those two clocks. Within the kept games a cadence has exactly one clock,
-so the crawler's blitz and rapid quotas become the 3+0 and 15+10 quotas without
+so the crawler's blitz and rapid quotas become the 3+0 and rapid-clock quotas without
 the crawler knowing.
 """
 
@@ -17,7 +17,8 @@ from chess_elo_drift.records import GameRecord
 
 
 def is_focus_game(record: GameRecord) -> bool:
-    return record.time_control in config.FOCUS_TIME_CONTROLS.get(record.time_class, frozenset())
+    clocks = config.FOCUS_TIME_CONTROLS.get(record.platform, {})
+    return record.time_control in clocks.get(record.time_class, frozenset())
 
 
 class FocusedSource:
@@ -37,7 +38,7 @@ class FocusedSource:
 
 
 def import_existing_games(platform: str, year: int, store) -> int:
-    """Copy the main corpus's 3+0 and 15+10 games of one site-year into the focus store.
+    """Copy the main corpus's focus-clock games of one site-year into the focus store.
 
     The main crawl met some of these clocks by chance; reusing them (and, at the
     evaluation step, their engine scores) saves requests without changing a

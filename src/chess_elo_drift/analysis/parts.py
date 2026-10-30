@@ -1,6 +1,6 @@
 """The two extra parts of the findings: the single-clock comparison and the first study.
 
-Part one compares years on 3+0 blitz and 15+10 rapid only, so the clock never
+Part one compares years on 3+0 blitz and one rapid clock per site only, so the clock never
 changes and nothing has to be corrected for it. Part three redoes the first
 version of the study (chess.com, 2018-2019 against 2024-2025, no clock control)
 on today's corpus, to show what chess.com's 2020 reclassification did to it.
@@ -22,7 +22,13 @@ from chess_elo_drift.analysis.statistics import ols_clustered
 logger = logging.getLogger(__name__)
 
 #: The clock each cadence is reduced to in part one.
-FOCUS_LABELS = {"blitz": "3+0", "rapid": "15+10"}
+FOCUS_LABELS = {"blitz": "3+0", "rapid": "15+10 / 10+0"}
+
+
+def focus_pool(platform: str, time_class: str) -> str:
+    """"chess.com 15+10": a site and the clock its cadence is reduced to."""
+    clock = config.FOCUS_CLOCK_LABELS.get(platform, {}).get(time_class, time_class)
+    return f"{config.PLATFORM_LABELS.get(platform, platform)} {clock}"
 
 #: Ratings the single-clock curves are read at, inside the range both clocks cover.
 FOCUS_RATINGS = (1000, 1400, 1800)
@@ -48,8 +54,8 @@ def focus_sample(evaluations: pd.DataFrame, max_per_player: int) -> tuple[pd.Dat
     controls = evaluations["time_control"].astype(str)
     on_clock = pd.Series(
         [
-            control in config.FOCUS_TIME_CONTROLS.get(time_class, frozenset())
-            for control, time_class in zip(controls, evaluations["time_class"])
+            control in config.FOCUS_TIME_CONTROLS.get(platform, {}).get(time_class, frozenset())
+            for control, time_class, platform in zip(controls, evaluations["time_class"], evaluations["platform"])
         ],
         index=evaluations.index,
     )
@@ -61,7 +67,7 @@ def focus_sample(evaluations: pd.DataFrame, max_per_player: int) -> tuple[pd.Dat
     head = pd.DataFrame(
         [
             ("evaluated player-sides", 0, len(evaluations)),
-            ("on the 3+0 or 15+10 clock", int((~on_clock).sum()), int(on_clock.sum())),
+            ("on a focus clock (3+0; 15+10 chess.com, 10+0 Lichess)", int((~on_clock).sum()), int(on_clock.sum())),
         ],
         columns=attrition.columns,
     )

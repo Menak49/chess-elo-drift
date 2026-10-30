@@ -187,12 +187,20 @@ LICHESS_RATE_LIMIT_PAUSE_SECONDS = 61.0
 # --- The single-clock comparison ---------------------------------------------
 
 #: Part one of the study compares years with one clock per cadence, so that no
-#: control for the clock is needed: 3+0 for blitz and 15+10 for rapid. The strings
-#: are the two sites' own spellings of the same clocks (chess.com writes 3+0 as
-#: "180", Lichess as "180+0").
-FOCUS_TIME_CONTROLS: dict[str, frozenset[str]] = {
-    "blitz": frozenset({"180", "180+0"}),
-    "rapid": frozenset({"900+10"}),
+#: control for the clock is needed: 3+0 for blitz everywhere, and for rapid 15+10 on
+#: chess.com and 10+0 on Lichess (almost nobody under 2000 plays 15+10 there). Years
+#: are only ever compared within a site, so the two rapid clocks need not match. The
+#: strings are the sites' own spellings (chess.com writes 3+0 as "180", Lichess as
+#: "180+0").
+FOCUS_TIME_CONTROLS: dict[str, dict[str, frozenset[str]]] = {
+    "chesscom": {"blitz": frozenset({"180"}), "rapid": frozenset({"900+10"})},
+    "lichess": {"blitz": frozenset({"180+0"}), "rapid": frozenset({"600+0"})},
+}
+
+#: How each site's focus clock is written in the findings.
+FOCUS_CLOCK_LABELS: dict[str, dict[str, str]] = {
+    "chesscom": {"blitz": "3+0", "rapid": "15+10"},
+    "lichess": {"blitz": "3+0", "rapid": "10+0"},
 }
 
 #: 15+10 is barely played above this rating, so the whole single-clock corpus

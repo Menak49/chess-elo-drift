@@ -187,7 +187,7 @@ def _focus_figures(results: Results, figures_dir: Path) -> dict[str, Path]:
             results.focus.levels,
             figures_dir / "focus_accuracy_by_year.png",
             title="Part 1: what a rating bought on one clock, year by year",
-            subtitle="3+0 blitz and 15+10 rapid only, so the clock is the same every year. Engine-recomputed "
+            subtitle="3+0 blitz, and 15+10 (chess.com) or 10+0 (Lichess) rapid, so the clock is the same every year. Engine-recomputed "
             "move accuracy of a player at a fixed rating. Bands: 95% CI, clustered by player.",
             panel_labels=parts.FOCUS_LABELS,
             mark_break=False,
@@ -289,7 +289,7 @@ def _demote(section: str) -> str:
 def _overview() -> str:
     return (
         "The study has three parts, from the simplest to the most detailed.\n\n"
-        "1. **One clock.** Only 3+0 blitz and 15+10 rapid games, on both sites. With the clock identical every "
+        "1. **One clock.** Only 3+0 blitz games, and 15+10 (chess.com) or 10+0 (Lichess) rapid games. With the clock identical every "
         "year there is nothing to correct for, so the comparison is direct.\n"
         "2. **The full corpus.** Every blitz and rapid game, all clocks mixed, with the clock controlled in the "
         "models. It reaches higher ratings, adds the site-to-site comparison and the 2026 conversion tables.\n"
@@ -1168,9 +1168,10 @@ def _caveats_section() -> str:
 def _part_one(results: Results, figures: dict[str, Path]) -> str:
     focus = results.focus
     lines = [
-        "## Part 1. One clock: 3+0 blitz and 15+10 rapid\n",
-        "Only games played at 3+0 (blitz) or 15+10 (rapid), on chess.com and on Lichess, rated up to "
-        f"{config.FOCUS_RATING_MAX} (15+10 is rare above). Within a cadence the clock never changes, so a year "
+        "## Part 1. One clock: 3+0 blitz and one rapid clock per site\n",
+        "Only games played at 3+0 (blitz) or, for rapid, at 15+10 on chess.com and 10+0 on Lichess (almost nobody "
+        f"under {config.FOCUS_RATING_MAX} plays 15+10 there), rated up to {config.FOCUS_RATING_MAX}. Years are only "
+        "compared within a site, so the two rapid clocks need not match. Within a pool the clock never changes, so a year "
         "cannot look stronger because its games were longer, and chess.com's 2020 reclassification of 10|0 does "
         "not touch either clock. The engine, the accuracy and the regression are those of part 2, minus the "
         "clock term, which has nothing left to control.\n",
@@ -1186,7 +1187,7 @@ def _part_one(results: Results, figures: dict[str, Path]) -> str:
 
     lines.append("**What it shows** (accuracy points per year at a fixed rating; positive = the same rating plays better):\n")
     for row in main.itertuples():
-        label = f"{config.PLATFORM_LABELS.get(row.platform, row.platform)} {parts.FOCUS_LABELS[row.time_class]}"
+        label = parts.focus_pool(row.platform, row.time_class)
         text = (
             f"- **{label}** ({row.first_year}-{row.last_year}): {yearly.verdict(pd.Series(row._asdict()))} "
             f"({row.trend_per_year:+.3f} per year, 95% CI {row.ci_low:+.3f} to {row.ci_high:+.3f})."
@@ -1210,7 +1211,7 @@ def _part_one(results: Results, figures: dict[str, Path]) -> str:
     if not focus.sizes.empty:
         sizes = focus.sizes.assign(
             pool=[
-                f"{config.PLATFORM_LABELS.get(p, p)} {parts.FOCUS_LABELS[t]}"
+                parts.focus_pool(p, t)
                 for p, t in zip(focus.sizes["platform"], focus.sizes["time_class"])
             ]
         )
@@ -1221,7 +1222,7 @@ def _part_one(results: Results, figures: dict[str, Path]) -> str:
     if not focus.effects.empty:
         effects = focus.effects.assign(
             cell=[
-                f"{config.PLATFORM_LABELS.get(p, p)} {parts.FOCUS_LABELS[t]}"
+                parts.focus_pool(p, t)
                 for p, t in zip(focus.effects["platform"], focus.effects["time_class"])
             ],
             text=[

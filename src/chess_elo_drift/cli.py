@@ -256,7 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--seed", type=int, default=20142026, help="RNG seed")
     collect.add_argument(
         "--focus", action="store_true",
-        help="single-clock corpus: only 3+0 and 15+10 games, ratings up to "
+        help="single-clock corpus: only 3+0 and one rapid clock per site (15+10, 10+0 on Lichess), ratings up to "
         f"{config.FOCUS_RATING_MAX}, stored apart from the main corpus",
     )
     collect.set_defaults(handler=run_collect)

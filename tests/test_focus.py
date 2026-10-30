@@ -49,6 +49,7 @@ def test_only_the_two_focus_clocks_are_kept_on_both_sites():
         record("1", "blitz", "180"),
         record("2", "blitz", "180+0", platform="lichess"),
         record("3", "rapid", "900+10"),
+        record("9", "rapid", "600+0", platform="lichess"),
     ]
     drop = [
         record("4", "blitz", "300"),
@@ -56,9 +57,11 @@ def test_only_the_two_focus_clocks_are_kept_on_both_sites():
         record("6", "rapid", "600"),
         record("7", "rapid", "1800"),
         record("8", "blitz", "900+10"),
+        record("10", "rapid", "900+10", platform="lichess"),
+        record("11", "rapid", "600+0"),
     ]
     harvest = FocusedSource(FakeSource(keep + drop)).month_games("a", YearMonth(2024, 3))
-    assert [game.game_id for game in harvest.games] == ["1", "2", "3"]
+    assert [game.game_id for game in harvest.games] == ["1", "2", "3", "9"]
     assert harvest.snapshot is None
     assert all(is_focus_game(game) for game in harvest.games)
 
@@ -86,7 +89,10 @@ def test_existing_games_are_reused_without_duplicates(tmp_path, monkeypatch):
 
 
 def evaluations_on_focus_clocks(years=(2018, 2022, 2026)) -> pd.DataFrame:
-    controls = {key: (("180",) if key[1] == "blitz" else ("900+10",)) for key in CONTROLS}
+    controls = {
+        key: (config.FOCUS_TIME_CONTROLS[key[0]][key[1]] and tuple(config.FOCUS_TIME_CONTROLS[key[0]][key[1]]))
+        for key in CONTROLS
+    }
     frame = synthetic_evaluations(years=years, per_cell=120, controls=controls, trend_per_year=-0.2, seed=5)
     return frame
 
@@ -95,7 +101,7 @@ def test_focus_sample_keeps_only_the_focus_clocks_and_ratings_up_to_the_cap():
     mixed = synthetic_evaluations(years=(2022, 2026), per_cell=80, seed=3)
     sample, attrition = parts.focus_sample(mixed, max_per_player=3)
     assert not sample.empty
-    allowed = sample.apply(lambda r: r["time_control"] in config.FOCUS_TIME_CONTROLS[r["time_class"]], axis=1)
+    allowed = sample.apply(lambda r: r["time_control"] in config.FOCUS_TIME_CONTROLS[r["platform"]][r["time_class"]], axis=1)
     assert allowed.all()
     assert sample["rating"].max() <= config.FOCUS_RATING_MAX
     assert attrition["rows_left"].iloc[-1] == len(sample)
