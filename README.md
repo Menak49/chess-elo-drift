@@ -150,7 +150,8 @@ worker whose engine dies starts a fresh one. `--workers` sets the parallelism
 on a subsample spread evenly across the design.
 
 **The single-clock corpus (part 1 of the findings).** The findings open with a
-simple comparison on one clock per cadence, 3+0 blitz and 15+10 rapid, so no clock
+simple comparison on one clock per pool, 3+0 blitz, and 15+10 rapid on chess.com or
+10+0 rapid on Lichess (almost nobody under 2000 plays 15+10 there), so no clock
 correction is needed. It has its own corpus, kept apart from the main one:
 
 ```bash
@@ -160,9 +161,9 @@ python -m chess_elo_drift.cli evaluate --focus    # -> data/processed/evaluation
 python -m chess_elo_drift.cli report              # picks the focus file up when it exists
 ```
 
-`--focus` keeps only games on those two clocks and ratings up to
+`--focus` keeps only games on those clocks and ratings up to
 `config.FOCUS_RATING_MAX` (15+10 is rare above 2000), stores them under
-`data/raw/focus/`, and reuses the 3+0 and 15+10 games (and their engine scores)
+`data/raw/focus/`, and reuses the games on those clocks (and their engine scores)
 the main crawl had already met. The same one-Lichess-job rule applies.
 
 **report** builds the estimation sample, runs every comparison and writes the
@@ -188,7 +189,7 @@ src/chess_elo_drift/
   chesscom/           chess.com client and endpoint wrappers
   lichess/            Lichess client, game export, extraction and seeding
   collection/         the stratified snowball crawler, its sources and stores,
-                      and the 3+0 / 15+10 filter of the single-clock corpus
+                      and the focus-clock filter of the single-clock corpus
   conversion/         the 2026 rating survey and cross-site account links
   engine/             UCI analysis, accuracy/ACPL scoring, parallel runner
   analysis/           estimation sample, yearly models, site equating,
