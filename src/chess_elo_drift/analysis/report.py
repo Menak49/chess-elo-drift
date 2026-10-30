@@ -1297,9 +1297,9 @@ def _part_three(results: Results, figures: dict[str, Path]) -> str:
     lines.append(_first_study_reading(study))
     lines.append(
         "\n**The figure.** The first report's chart was never saved to the repository, so it cannot be recovered. "
-        "The one below is **redrawn** with the first study's method on today's corpus. It is **not the original, "
-        "and it is worthless as evidence**: it shows exactly the comparison that was flawed, which is why it is "
-        "stamped on the chart.\n"
+        "The one below is redrawn with the first study's method on today's corpus. It is not the original, and it "
+        "shows exactly the comparison that was flawed.\n\n"
+        "**Regenerated, not the original: worthless as evidence.**\n"
     )
     lines.append(f"![the first study, redrawn]({_relative(figures['first_study'])})\n")
     lines.append(

@@ -169,7 +169,7 @@ the main crawl had already met. The same one-Lichess-job rule applies.
 **report** builds the estimation sample, runs every comparison and writes the
 findings in three parts: (1) the single-clock comparison, (2) the full corpus with
 the clock controlled, and (3) the first version of the study and how chess.com's
-2020 reclassification of 10|0 distorted it, with its chart redrawn and stamped as
+2020 reclassification of 10|0 distorted it, with its chart redrawn and flagged as
 not the original. It writes:
 
 ```

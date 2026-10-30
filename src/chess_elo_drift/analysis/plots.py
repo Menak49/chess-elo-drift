@@ -150,10 +150,6 @@ def plot_first_study(bands: pd.DataFrame, gaps: pd.DataFrame, output_path: Path)
                 0.03, 0.96, f"gap by the first method: {gap['gap'].iloc[0]:+.2f} points",
                 transform=axis.transAxes, fontsize=9, color=INK_SECONDARY, va="top",
             )
-        axis.text(
-            0.5, 0.5, "REGENERATED, NOT THE ORIGINAL\nWORTHLESS AS EVIDENCE", transform=axis.transAxes,
-            fontsize=14, color="#b0201a", alpha=0.35, ha="center", va="center", rotation=22, weight="bold",
-        )
     axes[0][0].set_ylabel("mean accuracy (%)", color=INK_SECONDARY, fontsize=10)
     _legend(figure, [(colours[era], era) for era in eras])
     _titles(
