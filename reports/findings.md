@@ -514,7 +514,7 @@ The regression alone cannot fully repair the comparison, because the two periods
 
 **The figure.** The first report's chart was never saved to the repository, so it cannot be recovered. The one below is redrawn with the first study's method on today's corpus. It is not the original, and it shows exactly the comparison that was flawed.
 
-**Regenerated, not the original: worthless as evidence.**
+**Worthless as evidence.**
 
 ![the first study, redrawn](figures/first_study_redrawn.png)
 
