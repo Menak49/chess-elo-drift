@@ -1,10 +1,71 @@
 # What does a chess rating buy? chess.com and Lichess, 2014-2026
 
+The study has three parts, from the simplest to the most detailed.
+
+1. **One clock.** Only 3+0 blitz games, and 15+10 (chess.com) or 10+0 (Lichess) rapid games. With the clock identical every year there is nothing to correct for, so the comparison is direct.
+2. **The full corpus.** Every blitz and rapid game, all clocks mixed, with the clock controlled in the models. It reaches higher ratings, adds the site-to-site comparison and the 2026 conversion tables.
+3. **The first study, and why it was wrong.** The first version of the study found that ratings had become easier to reach. Chess.com's reclassification of 10|0 in 2020 explains most of that result.
+
+## Part 1. One clock: 3+0 blitz and one rapid clock per site
+
+Only games played at 3+0 (blitz) or, for rapid, at 15+10 on chess.com and 10+0 on Lichess (almost nobody under 2000 plays 15+10 there), rated up to 2000. Years are only compared within a site, so the two rapid clocks need not match. Within a pool the clock never changes, so a year cannot look stronger because its games were longer, and chess.com's 2020 reclassification of 10|0 does not touch either clock. The engine, the accuracy and the regression are those of part 2, minus the clock term, which has nothing left to control.
+
+**What it shows** (accuracy points per year at a fixed rating; positive = the same rating plays better):
+
+- **chess.com 3+0** (2014-2026): no detectable change (-0.024 per year, 95% CI -0.088 to +0.040). A rating of 1500 in 2014 played 1.18 points more accurately than the same rating in 2026 (95% CI -0.04 to +2.40).
+- **chess.com 15+10** (2014-2026): no detectable change (+0.057 per year, 95% CI -0.005 to +0.118). A rating of 1500 in 2014 played 0.51 points less accurately than the same rating in 2026 (95% CI -1.62 to +0.59).
+- **Lichess 3+0** (2014-2026): no detectable change (+0.022 per year, 95% CI -0.084 to +0.128). A rating of 1500 in 2014 played 0.97 points less accurately than the same rating in 2026 (95% CI -2.94 to +1.01).
+- **Lichess 10+0** (2018-2026): no detectable change (-0.080 per year, 95% CI -0.210 to +0.051). A rating of 1500 in 2018 played 1.20 points more accurately than the same rating in 2026 (95% CI -0.29 to +2.69).
+
+Negative means ratings have become easier to reach: the same number buys less accurate play now. An accuracy point is worth very roughly 100-250 rating points, so differences under about half a point are within the noise of this design.
+
+![accuracy by year, one clock](figures/focus_accuracy_by_year.png)
+
+**Observations per year** (player-sides after the inclusion rules; a thin pool is less reliable):
+
+|   year |   Lichess 10+0 |   Lichess 3+0 |   chess.com 15+10 |   chess.com 3+0 |
+|-------:|---------------:|--------------:|------------------:|----------------:|
+|   2014 |              0 |           160 |               254 |             265 |
+|   2015 |              0 |           138 |               339 |             152 |
+|   2016 |              0 |           152 |               280 |             185 |
+|   2017 |              0 |           172 |               250 |             258 |
+|   2018 |            239 |           100 |               242 |             283 |
+|   2019 |            344 |           118 |               203 |             293 |
+|   2020 |            318 |           122 |               214 |             203 |
+|   2021 |            257 |           105 |               177 |             187 |
+|   2022 |            325 |           182 |               172 |             230 |
+|   2023 |            229 |           127 |               173 |             192 |
+|   2024 |            251 |           159 |               178 |             257 |
+|   2025 |            137 |           103 |               162 |             290 |
+|   2026 |            272 |           127 |               158 |             203 |
+
+**Each year against the reference year** (accuracy points at the same rating; positive = that year's players were more accurate than today's):
+
+|   year | Lichess 10+0           | Lichess 3+0            | chess.com 15+10        | chess.com 3+0          |
+|-------:|:-----------------------|:-----------------------|:-----------------------|:-----------------------|
+|   2014 |                        | -0.97 (-2.94 to +1.01) | -0.51 (-1.62 to +0.59) | +1.18 (-0.04 to +2.40) |
+|   2015 |                        | -2.72 (-5.15 to -0.30) | -2.34 (-3.44 to -1.23) | +1.11 (-0.31 to +2.54) |
+|   2016 |                        | -3.09 (-5.13 to -1.05) | -0.91 (-2.17 to +0.34) | +0.93 (-0.50 to +2.36) |
+|   2017 |                        | -3.64 (-5.61 to -1.68) | -0.03 (-1.20 to +1.14) | +1.86 (+0.65 to +3.07) |
+|   2018 | +1.20 (-0.29 to +2.69) | -1.61 (-3.76 to +0.54) | -0.38 (-1.47 to +0.71) | +1.56 (+0.40 to +2.72) |
+|   2019 | +1.00 (-0.29 to +2.29) | -1.72 (-3.70 to +0.26) | -0.93 (-2.11 to +0.25) | -0.51 (-1.79 to +0.78) |
+|   2020 | +0.60 (-0.73 to +1.93) | -1.85 (-3.93 to +0.24) | -2.07 (-3.30 to -0.84) | +0.69 (-0.77 to +2.15) |
+|   2021 | -0.32 (-1.71 to +1.08) | -4.37 (-6.60 to -2.14) | -2.19 (-3.43 to -0.95) | +1.08 (-0.24 to +2.40) |
+|   2022 | -0.74 (-2.03 to +0.54) | -1.77 (-3.56 to +0.03) | -0.73 (-2.01 to +0.55) | +1.82 (+0.62 to +3.01) |
+|   2023 | +0.69 (-0.65 to +2.04) | -3.77 (-5.70 to -1.83) | -1.36 (-2.56 to -0.17) | +1.43 (+0.07 to +2.79) |
+|   2024 | +1.32 (-0.14 to +2.77) | -2.86 (-4.71 to -1.02) | -0.15 (-1.35 to +1.05) | +0.81 (-0.37 to +1.98) |
+|   2025 | +0.41 (-1.03 to +1.86) | -2.77 (-4.75 to -0.80) | -0.40 (-1.60 to +0.80) | +1.44 (+0.27 to +2.62) |
+|   2026 | reference              | reference              | reference              | reference              |
+
+Part 1 deliberately stops here: the cells are smaller than in part 2 (one clock instead of all of them), so it says *which way and roughly how much* and leaves the finer questions (rating slope, robustness, site-to-site offsets) to part 2.
+
+## Part 2. The full corpus: every cadence, with the clock controlled
+
 Built from 24,193 player-observations (19,127 games, 18,195 players) re-analysed with one engine, plus the 2026 rating surveys. Every number here is computed by `analysis/report.py`; re-running the report rewrites them.
 
-## The answers
+### The answers
 
-### 1. Year by year: does a given rating buy the same play as it used to?
+#### 1. Year by year: does a given rating buy the same play as it used to?
 
 - **chess.com blitz** (2014-2026): chess.com reclassified 10|0 as rapid on 2020-09-10, so each side is read on its own. Before (2014-2019): no detectable change (-0.131 accuracy points per year, 95% CI -0.264 to +0.001). After (2021-2026): no detectable change (+0.024 accuracy points per year, 95% CI -0.113 to +0.161). Across the break, a given rating played 0.35 points more accurately in 2021 than in 2019 (about 95% CI -0.81 to +1.52). One line across the whole span, for comparison: no detectable change (-0.001 accuracy points per year, 95% CI -0.042 to +0.041). A 1500 in 2014 played 0.51 points more accurately than a 1500 in 2026 (95% CI -0.32 to +1.34).
 - **chess.com rapid** (2014-2026): chess.com reclassified 10|0 as rapid on 2020-09-10, so each side is read on its own. Before (2014-2019): a given rating buys more accuracy each year (+0.166 accuracy points per year, 95% CI +0.025 to +0.307). After (2021-2026): no detectable change (+0.143 accuracy points per year, 95% CI -0.002 to +0.288). Across the break, a given rating played 1.32 points less accurately in 2021 than in 2019 (about 95% CI -2.61 to -0.03), worth very roughly -220 rating points. One line across the whole span, for comparison: no detectable change (+0.002 accuracy points per year, 95% CI -0.055 to +0.060). A 1500 in 2014 played 0.24 points less accurately than a 1500 in 2026 (95% CI -1.20 to +0.73).
@@ -13,7 +74,7 @@ Built from 24,193 player-observations (19,127 games, 18,195 players) re-analysed
 
 Negative means ratings have become easier to reach: the same number buys less accurate play now. Every comparison holds the rating and the clock fixed; see *Year by year* for each year.
 
-### 2. chess.com against Lichess
+#### 2. chess.com against Lichess
 
 At equal move accuracy in 2026, the Lichess rating sits this far from the chess.com one (Lichess minus chess.com, 95% bootstrap CI):
 
@@ -29,7 +90,7 @@ At equal move accuracy in 2026, the Lichess rating sits this far from the chess.
 
 This is *accuracy equating*: the engine judges both sites' moves the same way, so the rating on each site that produces the same accuracy is matched. It is an independent estimate, not a head count of players who play on both sites -- that is part 3.
 
-### 3. 2026 conversion formulas between the four pools
+#### 3. 2026 conversion formulas between the four pools
 
 A rating in one pool is matched to the rating in another that sits at the *same percentile* among the people with established ratings in both (equipercentile linking). The match is symmetric, so converting there and back returns the starting rating, and it follows the relation where it bends.
 
@@ -109,7 +170,7 @@ From **Lichess blitz**:
 
 These convert a *level*. An individual's actual rating in the other pool scatters around it: the typical 95% range is ±360 points, because people are genuinely better at one cadence or site than another. The per-pair spread is in `conversion_table.csv` (`typical_low`/`typical_high`).
 
-## How it was measured
+### How it was measured
 
 - Rated blitz and rapid games from chess.com and Lichess, 2014-2026, crawled from the same calendar months every year (March, June, September) with an equal quota per month, and every model controls for the calendar month as well. The quotas were not always met: these site-years still draw more than 60% of their rows from one month, so their year effects lean on the month control, or are confounded with the season where a pool has too few mixed years to estimate it: Lichess 2014 (61%).
 - A player's rating is the one printed on that game. Each site's blitz and rapid are separate pools and are never pooled; nor are the two sites.
@@ -147,7 +208,7 @@ Observations per year after the rules (Lichess rapid starts in 2018, when the po
 |   2025 |             414 |             349 |               562 |               501 |
 |   2026 |             569 |             588 |               398 |               461 |
 
-## Year by year
+### Year by year
 
 One model per site and cadence: `accuracy ~ C(year) + rating + rating² + log(clock)`, clustered by player. The year coefficients compare each year with the reference year at the *same* rating and clock; the trend replaces them with a straight line in the year.
 
@@ -195,7 +256,7 @@ The last-but-one column divides the trend by the accuracy-per-rating slope. That
 
 The slope changes over the years in chess.com blitz, chess.com rapid, Lichess blitz, Lichess rapid: there, the year gap differs by rating level, and the figure above (which lets every year have its own slope) is the better guide than a single number.
 
-## chess.com against Lichess
+### chess.com against Lichess
 
 For each year and cadence with at least 60 rows on both sites, each site's `accuracy ~ rating + rating² + log(clock)` curve is fitted separately, and a chess.com rating is matched to the Lichess rating with the same predicted accuracy at the same clock. Intervals: 95% bootstrap over players (300 replicates). A blank means the match falls outside the ratings sampled on the other site; an offset with no interval means more than 20% of replicates found no match.
 
@@ -223,7 +284,7 @@ Skipped because one site had fewer than 60 usable rows (rows on each site in bra
 
 Equal accuracy is not equal standing in the pool: the claim is only that the two groups make moves of the same engine-judged quality at the same clock. The reverse direction (Lichess to chess.com) is in `site_offsets.csv`.
 
-## 2026 conversion: details
+### 2026 conversion: details
 
 ![conversions](figures/conversion_2026.png)
 
@@ -315,7 +376,7 @@ The relation bends noticeably for: chess.com rapid → chess.com blitz. There th
 | chess.com blitz → chess.com rapid |     1500 |         1655 | 1730 (1700–1760)     |                   1680 |                   1665 |                      +75 |
 | chess.com blitz → chess.com rapid |     2000 |         1995 | 2115 (2100–2130)     |                   2145 |                   2080 |                     +120 |
 
-## Robustness
+### Robustness
 
 The trend (accuracy points per year at a fixed rating) under alternative choices. Without the clock control, a shift in the time-control mix is read as a change in skill; the stable-controls row keeps only chess.com time controls whose class never changed; one game per player removes any weight from prolific accounts; ACPL is a second metric that does not depend on the accuracy formula (lower is better, so its sign is reversed).
 
@@ -333,7 +394,7 @@ The trend (accuracy points per year at a fixed rating) under alternative choices
 | ratings 1000+ only (clear of every rating floor)      | +0.044 (-0.001 to +0.090) | -0.044 (-0.129 to +0.041) | -0.059 (-0.102 to -0.016) | -0.128 (-0.186 to -0.070) |
 | average centipawn loss instead of accuracy            | -1.162 (-1.494 to -0.831) | -0.563 (-1.147 to +0.021) | -0.265 (-0.541 to +0.010) | -0.137 (-0.496 to +0.221) |
 
-## Shape check: band by year
+### Shape check: band by year
 
 Mean accuracy per 300-point band and year, with no model at all. A shape check on the regressions, not a set of findings: cells are small and players sit at different points within a band.
 
@@ -381,7 +442,7 @@ Mean accuracy per 300-point band and year, with no model at all. A shape check o
 | 1800-2099 |  87.74 |  89.05 |  88.99 |  87.99 |  87.86 |  87.39 |  88.42 |  87.46 |  87.28 |
 | 2100-2399 |  90.02 |  90.88 |  89.97 |  89.18 |  90    |  89.29 |  89.58 |  89.18 |  89.33 |
 
-## Why accuracy was recomputed
+### Why accuracy was recomputed
 
 chess.com's own accuracy exists only for games somebody ran a review on, its formula has changed over the years, and Lichess publishes none through the same archive. Comparing years or sites on it would compare the games people chose to review, across a moving formula. Every game is therefore re-scored with one engine at one depth.
 
@@ -407,7 +468,7 @@ Share of chess.com sides carrying a reported accuracy:
 
 Where both numbers exist (n = 1185), the recomputed accuracy tracks chess.com's (Pearson r = 0.72, Spearman rho = 0.79): the instrument measures the same thing on a different scale (mean 87.3 here against 74.6 reported).
 
-## What this cannot tell you
+### What this cannot tell you
 
 - **Survivorship, worse the further back.** Old games can only be read from accounts that still exist. Players who quit and closed their account are invisible, and a 2014 sample is more filtered than a 2025 one.
 - **Activity weighting.** The crawler walks the opponent graph, so a player with a hundred games that month is likelier to be sampled than one with three. The sample describes the opposition you would actually meet at a rating, not a uniform draw over accounts.
@@ -422,10 +483,53 @@ Where both numbers exist (n = 1185), the recomputed accuracy tracks chess.com's 
 - **The rating survey is a cross-section, not a panel.** It pairs each person's current ratings; it says how the pools relate in the survey year, not how any person's ratings evolved.
 - **Equal accuracy is not equal rating.** The site comparison equates move quality, not results against a common opponent; the conversion formulas equate people, not moves. Where the two agree, both are more credible.
 
+## Part 3. The first study, and what chess.com's 2020 reclassification did to it
+
+**The first version.** The study began as a chess.com-only comparison of 2018-2019 with 2024-2025, ratings 600-2200, one regression per cadence (`accuracy ~ era + rating + rating²`, no clock term). On its first, small sample (1,507 player-observations) it found that players of the same rating played worse in 2024-2025: -1.34 accuracy points in blitz and -1.39 in rapid, worth very roughly -350 and -230 rating points. The reading was that chess.com ratings had become easier to reach. **That conclusion was wrong,** or at least not supported.
+
+**The problem.** On 2020-09-10 chess.com reclassified 10|0 from blitz to rapid ([announcement](https://www.chess.com/news/view/10-minute-chess-now-rapid-rated-bullet-ratings-increased)). Games are filed by the class they were rated in, so the two periods are not made of the same games: before, "rapid" was essentially 15-minute-plus play and 10|0 sat in blitz; after, 10|0 is the bulk of "rapid". Shorter games are played less accurately whatever the rating, so "rapid" in the later period looked worse for a reason that has nothing to do with rating inflation. The first study compared two cadences whose contents had changed underneath them.
+
+**What the two periods are made of** (chess.com, today's corpus):
+
+| cadence   | period    |   observations | share of games at 10|0   |   mean clock (minutes per side) |
+|:----------|:----------|---------------:|:-------------------------|--------------------------------:|
+| blitz     | 2018-2019 |            973 | 19%                      |                             5   |
+| blitz     | 2024-2025 |            940 | 0%                       |                             3.8 |
+| rapid     | 2018-2019 |            842 | 0%                       |                            23.3 |
+| rapid     | 2024-2025 |            886 | 81%                      |                            13.4 |
+
+**The same comparison, redone on today's larger corpus** (2024-2025 minus 2018-2019, accuracy points at the same rating; negative = the same rating plays worse now):
+
+| method                                       | blitz                  | rapid                  |
+|:---------------------------------------------|:-----------------------|:-----------------------|
+| first study's method (no clock control)      | +0.18 (-0.37 to +0.74) | -1.95 (-2.54 to -1.35) |
+| holding the clock fixed                      | +0.36 (-0.21 to +0.93) | -1.22 (-1.92 to -0.53) |
+| only time controls whose class never changed | +0.19 (-0.40 to +0.78) | -0.04 (-0.93 to +0.85) |
+
+- **blitz:** on the larger corpus the first method finds no gap (+0.18, -0.37 to +0.74); the -1.34 of the first report was a small-sample result that did not hold up.
+- **rapid:** the first method still finds -1.95 (-2.54 to -1.35); holding the clock fixed by regression leaves -1.22 (-1.92 to -0.53); comparing only time controls that never changed class gives -0.04 (-0.93 to +0.85), which is no gap at all.
+
+The regression alone cannot fully repair the comparison, because the two periods barely overlap in clock (long games before, 10|0 after) and it has to extrapolate across the gap; only the like-for-like comparison is clean. It is also a sample of different people: those who followed 10|0 into rapid are not those who played 15-minute games. Where the gap vanishes in the like-for-like row, the reclassification explains it and rating drift does not.
+
+
+**The figure.** The first report's chart was never saved to the repository, so it cannot be recovered. The one below is **redrawn** with the first study's method on today's corpus. It is **not the original, and it is worthless as evidence**: it shows exactly the comparison that was flawed, which is why it is stamped on the chart.
+
+![the first study, redrawn](figures/first_study_redrawn.png)
+
+**What replaced it.** Parts 1 and 2 hold the clock fixed (part 1 by construction, part 2 by regression and by a check restricted to time controls chess.com never reclassified), and part 2 fits chess.com on each side of the break. What survives is much smaller than the first study's headline.
+
 ## Files
 
 Tables (CSV, full precision):
 
+- `tables/focus_sample_attrition.csv`
+- `tables/focus_sample_sizes.csv`
+- `tables/focus_year_effects.csv`
+- `tables/focus_accuracy_at_ratings.csv`
+- `tables/focus_year_trends.csv`
+- `tables/first_study_gaps.csv`
+- `tables/first_study_composition.csv`
+- `tables/first_study_bands.csv`
 - `tables/sample_attrition.csv`
 - `tables/sample_sizes.csv`
 - `tables/year_effects.csv`
@@ -445,6 +549,8 @@ Tables (CSV, full precision):
 
 Figures:
 
+- `figures/focus_accuracy_by_year.png`
+- `figures/first_study_redrawn.png`
 - `figures/accuracy_by_year.png`
 - `figures/trend_robustness.png`
 - `figures/site_offsets.png`

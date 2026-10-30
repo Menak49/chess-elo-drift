@@ -1,0 +1,7 @@
+time_class,specification,label,gap,ci_low,ci_high,p_value,observations,players
+blitz,original,first study's method (no clock control),0.1825,-0.3748,0.7398,0.5208,1913,1625
+blitz,clock,holding the clock fixed,0.3597,-0.2134,0.9328,0.2185,1913,1625
+blitz,stable,only time controls whose class never changed,0.1859,-0.4038,0.7755,0.5365,1725,1476
+rapid,original,first study's method (no clock control),-1.9489,-2.5447,-1.3531,0.0,1728,1357
+rapid,clock,holding the clock fixed,-1.225,-1.9196,-0.5304,0.0006,1728,1357
+rapid,stable,only time controls whose class never changed,-0.0395,-0.9307,0.8517,0.9307,858,655

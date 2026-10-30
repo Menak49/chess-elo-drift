@@ -1,0 +1,10 @@
+rule,rows_removed,rows_left
+evaluated player-sides,0,19478
+"on a focus clock (3+0; 15+10 chess.com, 10+0 Lichess)",0,19478
+accuracy scored on at least 8 moves,431,19047
+"blitz or rapid, with a known clock",0,19047
+rating within 600-2400,182,18865
+rating pool existed that month (Lichess rapid from 2018-01),0,18865
+Lichess rating not provisional,387,18478
+"at most 3 rows per player, site, year and cadence",5977,12501
+rating up to 2000 (15+10 is rare above),2564,9937

@@ -1,0 +1,5 @@
+platform,time_class,specification,label,metric,trend_per_year,std_error,ci_low,ci_high,p_value,first_year,last_year,years,observations,players,slope_per_100,rating_points_per_year
+chesscom,blitz,main,main model (clock-controlled),accuracy,-0.0244,0.0327,-0.0885,0.0397,0.4559,2014,2026,13,2998,2432,0.3553,-6.8623
+chesscom,rapid,main,main model (clock-controlled),accuracy,0.0568,0.0314,-0.0047,0.1184,0.0701,2014,2026,13,2802,2113,0.6683,8.5066
+lichess,blitz,main,main model (clock-controlled),accuracy,0.0223,0.054,-0.0837,0.1283,0.6794,2014,2026,13,1765,1347,0.5086,4.3926
+lichess,rapid,main,main model (clock-controlled),accuracy,-0.0797,0.0665,-0.2101,0.0507,0.2307,2018,2026,9,2372,1857,0.51,-15.6321
