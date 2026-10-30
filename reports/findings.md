@@ -512,7 +512,9 @@ Where both numbers exist (n = 1185), the recomputed accuracy tracks chess.com's 
 The regression alone cannot fully repair the comparison, because the two periods barely overlap in clock (long games before, 10|0 after) and it has to extrapolate across the gap; only the like-for-like comparison is clean. It is also a sample of different people: those who followed 10|0 into rapid are not those who played 15-minute games. Where the gap vanishes in the like-for-like row, the reclassification explains it and rating drift does not.
 
 
-**The figure.** The first report's chart was never saved to the repository, so it cannot be recovered. The one below is **redrawn** with the first study's method on today's corpus. It is **not the original, and it is worthless as evidence**: it shows exactly the comparison that was flawed, which is why it is stamped on the chart.
+**The figure.** The first report's chart was never saved to the repository, so it cannot be recovered. The one below is redrawn with the first study's method on today's corpus. It is not the original, and it shows exactly the comparison that was flawed.
+
+**Regenerated, not the original: worthless as evidence.**
 
 ![the first study, redrawn](figures/first_study_redrawn.png)
 
