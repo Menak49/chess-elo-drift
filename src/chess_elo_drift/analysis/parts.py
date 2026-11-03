@@ -21,10 +21,6 @@ from chess_elo_drift.analysis.statistics import ols_clustered
 
 logger = logging.getLogger(__name__)
 
-#: The clock each cadence is reduced to in part one.
-FOCUS_LABELS = {"blitz": "3+0", "rapid": "15+10 / 10+0"}
-
-
 def focus_pool(platform: str, time_class: str) -> str:
     """"chess.com 15+10": a site and the clock its cadence is reduced to."""
     clock = config.FOCUS_CLOCK_LABELS.get(platform, {}).get(time_class, time_class)

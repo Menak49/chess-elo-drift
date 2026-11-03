@@ -189,7 +189,7 @@ def _focus_figures(results: Results, figures_dir: Path) -> dict[str, Path]:
             title="Part 1: what a rating bought on one clock, year by year",
             subtitle="3+0 blitz, and 15+10 (chess.com) or 10+0 (Lichess) rapid, so the clock is the same every year. Engine-recomputed "
             "move accuracy of a player at a fixed rating. Bands: 95% CI, clustered by player.",
-            panel_labels=parts.FOCUS_LABELS,
+            panel_labels=config.FOCUS_CLOCK_LABELS,
             mark_break=False,
         ),
     }

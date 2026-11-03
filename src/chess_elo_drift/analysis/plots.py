@@ -72,13 +72,13 @@ def plot_accuracy_by_year(
     *,
     title: str = "What a rating bought, year by year",
     subtitle: str | None = None,
-    panel_labels: dict[str, str] | None = None,
+    panel_labels: dict[str, dict[str, str]] | None = None,
     mark_break: bool = True,
 ) -> Path:
     """Accuracy at fixed ratings, per year, one panel per site and cadence.
 
-    `panel_labels` renames the cadences (the single-clock figure calls them by
-    their clock) and `mark_break` draws chess.com's 10|0 line, which only means
+    `panel_labels` renames the cadences per site (the single-clock figure calls
+    them by their clock) and `mark_break` draws chess.com's 10|0 line, which only means
     something when 10|0 games are in the data.
     """
     if levels.empty:
@@ -91,7 +91,7 @@ def plot_accuracy_by_year(
         for column, time_class in enumerate(config.TIME_CLASSES):
             axis = axes[row][column]
             panel = levels[(levels["platform"] == platform) & (levels["time_class"] == time_class)]
-            label = (panel_labels or {}).get(time_class, time_class)
+            label = (panel_labels or {}).get(platform, {}).get(time_class, time_class)
             _style_axis(axis, f"{config.PLATFORM_LABELS.get(platform, platform)} {label}")
             if panel.empty:
                 _empty_panel(axis)
